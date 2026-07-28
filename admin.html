@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+        body { background: #0B0514; min-height: 100vh; color: #fff; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #B366FF; border-radius: 10px; }
+
+        @keyframes fadeUp { from { opacity:0; transform:translateY(40px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+        @keyframes slideDown { from { opacity:0; transform:translateY(-30px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
+
+        /* --- LOGIN --- */
+        .login-overlay { position:fixed; inset:0; background:radial-gradient(ellipse at center,#1A0F2E 0%,#0B0514 100%); z-index:99999; display:flex; justify-content:center; align-items:center; padding:20px; }
+        .login-overlay.hidden { display:none; }
+        .login-card { background:rgba(26,15,46,0.95); backdrop-filter:blur(20px); padding:45px 38px; border-radius:24px; width:100%; max-width:420px; box-shadow:0 30px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(179,102,255,0.15); animation:fadeUp 0.6s ease; }
+        .login-logo { text-align:center; margin-bottom:30px; }
+        .login-logo .icon-box { width:70px; height:70px; border-radius:20px; background:linear-gradient(135deg,#B366FF,#7C3AED); display:flex; align-items:center; justify-content:center; margin:0 auto 15px; box-shadow:0 10px 30px rgba(179,102,255,0.3); }
+        .login-logo .icon-box i { font-size:32px; }
+        .login-logo h1 { font-size:22px; font-weight:800; background:linear-gradient(135deg,#B366FF,#D98EFF); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .login-logo p { color:#888; font-size:13px; margin-top:4px; }
+        .login-error { color:#FF4C4C; font-size:12px; display:none; margin-bottom:12px; text-align:center; background:rgba(255,76,76,0.1); padding:10px; border-radius:10px; border:1px solid rgba(255,76,76,0.2); }
+
+        .form-group { margin-bottom: 18px; }
+        label { display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        .input-wrap { position:relative; }
+        .input-wrap i { position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#555; font-size:16px; }
+        input { width:100%; padding:14px 15px 14px 45px; background:rgba(21,10,33,0.8); border:1px solid rgba(179,102,255,0.15); border-radius:12px; color:#fff; font-size:14px; transition:0.3s; }
+        input:focus { border-color:#B366FF; box-shadow:0 0 20px rgba(179,102,255,0.15); outline:none; background:rgba(21,10,33,1); }
+        input[type="checkbox"] { width:auto; padding:0; accent-color:#B366FF; cursor:pointer; }
+        .toggle-switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+        .toggle-switch input { opacity:0; width:0; height:0; }
+        .toggle-slider { position:absolute; cursor:pointer; inset:0; background:#333; border-radius:24px; transition:0.3s; }
+        .toggle-slider::before { content:''; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background:linear-gradient(135deg,#B366FF,#7C3AED); }
+        .toggle-switch input:checked + .toggle-slider::before { transform:translateX(20px); }
+
+        .btn { padding:14px 25px; border:none; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.3s; text-transform:uppercase; letter-spacing:1px; display:inline-flex; align-items:center; gap:10px; justify-content:center; }
+        .btn-primary { background:linear-gradient(135deg,#B366FF,#7C3AED); color:#fff; width:100%; box-shadow:0 8px 25px rgba(179,102,255,0.3); }
+        .btn-primary:hover { transform:translateY(-2px); box-shadow:0 12px 35px rgba(179,102,255,0.5); }
+
+        /* --- TOP TASKBAR --- */
+        .taskbar {
+            position:fixed; top:0; left:0; right:0; height:72px;
+            background:rgba(26,15,46,0.92); backdrop-filter:blur(14px);
+            border-bottom:1px solid rgba(179,102,255,0.08);
+            display:flex; align-items:center; justify-content:space-between;
+            padding:0 35px; z-index:500;
+            animation:slideDown 0.5s ease;
+        }
+        .taskbar-left { display:flex; align-items:center; gap:16px; }
+        .taskbar-brand { display:flex; align-items:center; gap:12px; }
+        .taskbar-brand .brand-icon { width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,#B366FF,#7C3AED); display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow:0 8px 20px rgba(179,102,255,0.3); }
+        .taskbar-brand h1 { font-size:17px; font-weight:700; }
+        .taskbar-brand span { font-size:10px; color:#888; display:block; letter-spacing:1px; text-transform:uppercase; }
+
+        .taskbar-nav { display:flex; align-items:center; gap:5px; margin-left:40px; }
+        .taskbar-nav .t-nav { padding:8px 18px; border-radius:10px; color:#C792EA; font-size:13px; font-weight:500; cursor:pointer; transition:0.3s; display:flex; align-items:center; gap:8px; }
+        .taskbar-nav .t-nav:hover { background:rgba(179,102,255,0.08); color:#fff; }
+        .taskbar-nav .t-nav.active { background:rgba(179,102,255,0.15); color:#fff; box-shadow:0 0 20px rgba(179,102,255,0.05); }
+        .taskbar-nav .t-nav i { font-size:14px; }
+        .taskbar-nav .t-nav .count { background:rgba(179,102,255,0.2); color:#B366FF; font-size:10px; font-weight:700; padding:1px 7px; border-radius:20px; margin-left:4px; }
+
+        .taskbar-right { display:flex; align-items:center; gap:18px; }
+        .tb-user { display:flex; align-items:center; gap:10px; cursor:pointer; padding:6px 12px 6px 6px; border-radius:12px; transition:0.3s; }
+        .tb-user:hover { background:rgba(179,102,255,0.06); }
+        .tb-user .avatar { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#B366FF,#7C3AED); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; }
+        .tb-user .info { line-height:1.3; }
+        .tb-user .info strong { font-size:13px; }
+        .tb-user .info p { font-size:10px; color:#888; }
+        .tb-user .dot { width:8px; height:8px; border-radius:50%; background:#00E676; box-shadow:0 0 10px rgba(0,230,118,0.5); animation:pulse 2s infinite; }
+        .tb-logout { width:36px; height:36px; border-radius:10px; border:1px solid rgba(255,76,76,0.2); background:rgba(255,76,76,0.05); color:#FF6B6B; cursor:pointer; transition:0.3s; display:flex; align-items:center; justify-content:center; }
+        .tb-logout:hover { background:rgba(255,76,76,0.15); color:#FF4C4C; border-color:#FF4C4C; }
+
+        /* --- MAIN --- */
+        .main-content { margin-top:72px; padding:30px 35px; overflow-y:auto; height:calc(100vh - 72px); background:radial-gradient(ellipse at 20% 20%,rgba(179,102,255,0.03) 0%,transparent 60%); }
+        .page { display:none; animation:fadeUp 0.4s ease; }
+        .page.active { display:block; }
+
+        .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; flex-wrap:wrap; gap:12px; }
+        .page-header h2 { font-size:20px; font-weight:700; color:#C792EA; display:flex; align-items:center; gap:10px; }
+        .page-header h2 i { color:#B366FF; }
+        .page-header .right { display:flex; align-items:center; gap:12px; }
+        .page-header .time { font-size:11px; color:#555; }
+        .refresh-btn { width:34px; height:34px; border-radius:10px; border:1px solid rgba(179,102,255,0.15); background:rgba(179,102,255,0.05); color:#B366FF; cursor:pointer; transition:0.3s; display:flex; align-items:center; justify-content:center; }
+        .refresh-btn:hover { background:rgba(179,102,255,0.15); transform:rotate(90deg); }
+
+        .card { background:rgba(26,15,46,0.8); backdrop-filter:blur(10px); padding:25px; border-radius:18px; margin-bottom:25px; border:1px solid rgba(179,102,255,0.06); box-shadow:0 10px 40px rgba(0,0,0,0.2); }
+        .card-title { color:#B366FF; font-size:14px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid rgba(179,102,255,0.08); padding-bottom:12px; }
+
+        .dash-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:25px; }
+        .stat-box { padding:26px 22px; border-radius:18px; text-align:center; position:relative; overflow:hidden; transition:0.4s; cursor:default; }
+        .stat-box::after { content:''; position:absolute; top:-50%; right:-50%; width:100%; height:100%; background:rgba(255,255,255,0.03); border-radius:50%; }
+        .stat-box:hover { transform:translateY(-5px); box-shadow:0 15px 40px rgba(0,0,0,0.3); }
+        .stat-box h3 { font-size:42px; font-weight:800; text-shadow:0 2px 10px rgba(0,0,0,0.3); line-height:1; margin-top:5px; }
+        .stat-box p { font-size:11px; text-transform:uppercase; letter-spacing:1.5px; font-weight:600; opacity:0.8; margin-top:2px; }
+        .stat-box.purple { background:linear-gradient(135deg,#3c096c,#5a189a); }
+        .stat-box.green { background:linear-gradient(135deg,#004d40,#00695c); }
+        .stat-box.red { background:linear-gradient(135deg,#4a0024,#880e4f); }
+
+        .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .info-item { background:rgba(11,5,20,0.5); padding:14px 16px; border-radius:12px; border:1px solid rgba(179,102,255,0.05); }
+        .info-item .lbl { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+        .info-item .val { font-size:14px; font-weight:600; margin-top:4px; word-break:break-all; }
+
+        .app-list { list-style:none; }
+        .app-item { background:rgba(11,5,20,0.5); border:1px solid rgba(179,102,255,0.06); padding:16px 18px; border-radius:14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; transition:0.3s; }
+        .app-item:hover { border-color:rgba(179,102,255,0.2); background:rgba(179,102,255,0.03); }
+        .app-info h4 { font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; }
+        .app-info p { font-size:11px; color:#666; margin-top:3px; }
+        .badge { padding:3px 12px; border-radius:20px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+        .b-active { background:rgba(0,230,118,0.1); color:#00E676; border:1px solid rgba(0,230,118,0.2); }
+        .b-expired { background:rgba(255,76,76,0.1); color:#FF4C4C; border:1px solid rgba(255,76,76,0.2); }
+
+        .success-msg { color:#00E676; font-size:13px; display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(0,230,118,0.08); border:1px solid rgba(0,230,118,0.15); }
+        .error-msg { color:#FF4C4C; font-size:13px; display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(255,76,76,0.08); border:1px solid rgba(255,76,76,0.15); }
+
+        /* --- MODAL --- */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:2000; justify-content:center; align-items:center; padding:20px; }
+        .modal-overlay.show { display:flex; }
+        .modal-box { background:#1A0F2E; padding:30px; border-radius:18px; width:100%; max-width:420px; border:1px solid rgba(179,102,255,0.2); box-shadow:0 30px 80px rgba(0,0,0,0.8); animation:fadeUp 0.3s ease; }
+        .modal-box h3 { margin-bottom:20px; font-size:17px; display:flex; align-items:center; gap:10px; }
+        .modal-box .form-group { margin-bottom:14px; }
+        .modal-box input { padding-left:15px; }
+
+        .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:25px; }
+        .settings-grid .card { margin-bottom:0; }
+
+        /* --- MOBILE NAV --- */
+        .mobile-nav-toggle { display:none; width:38px; height:38px; border-radius:10px; border:1px solid rgba(179,102,255,0.15); background:rgba(179,102,255,0.05); color:#B366FF; cursor:pointer; align-items:center; justify-content:center; font-size:18px; transition:0.3s; }
+        .mobile-nav-toggle:hover { background:rgba(179,102,255,0.15); }
+        .mobile-nav-dropdown { display:none; position:fixed; top:72px; left:0; right:0; background:rgba(26,15,46,0.98); backdrop-filter:blur(20px); border-bottom:1px solid rgba(179,102,255,0.1); padding:12px 20px; z-index:499; animation:slideDown 0.3s ease; }
+        .mobile-nav-dropdown.show { display:block; }
+        .mobile-nav-dropdown .m-nav { padding:12px 14px; border-radius:10px; color:#C792EA; font-size:14px; font-weight:500; cursor:pointer; transition:0.3s; display:flex; align-items:center; gap:12px; }
+        .mobile-nav-dropdown .m-nav:hover, .mobile-nav-dropdown .m-nav.active { background:rgba(179,102,255,0.12); color:#fff; }
+        .mobile-nav-dropdown .m-nav i { width:20px; text-align:center; }
+        .mobile-nav-dropdown .m-nav .count { margin-left:auto; background:rgba(179,102,255,0.2); color:#B366FF; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; }
+        .mobile-nav-dropdown .divider { height:1px; background:rgba(179,102,255,0.08); margin:8px 0; }
+
+        @media (max-width:1024px) {
+            .taskbar { padding:0 20px; }
+            .taskbar-nav { display:none; }
+            .mobile-nav-toggle { display:flex; }
+            .main-content { padding:20px; }
+        }
+        @media (max-width:768px) {
+            .taskbar { height:62px; padding:0 15px; }
+            .taskbar-brand .brand-icon { width:34px; height:34px; font-size:16px; }
+            .taskbar-brand h1 { font-size:15px; }
+            .taskbar-brand span { font-size:9px; }
+            .taskbar-right { gap:10px; }
+            .tb-user .info { display:none; }
+            .tb-user .avatar { width:32px; height:32px; font-size:13px; }
+            .tb-logout { width:34px; height:34px; font-size:13px; }
+            .main-content { margin-top:62px; padding:15px; height:calc(100vh - 62px); }
+            .mobile-nav-dropdown { top:62px; }
+            .page-header h2 { font-size:17px; }
+            .dash-grid { grid-template-columns:1fr 1fr; gap:12px; }
+            .stat-box { padding:20px 16px; }
+            .stat-box h3 { font-size:32px; }
+            .card { padding:18px; border-radius:14px; }
+            .info-grid { grid-template-columns:1fr; }
+            .login-card { padding:30px 22px; }
+            #page-settings .card:first-child div[style*="grid-template-columns"] { grid-template-columns:1fr !important; }
+        }
+        @media (max-width:480px) {
+            .taskbar { height:56px; padding:0 12px; }
+            .taskbar-brand .brand-icon { width:30px; height:30px; font-size:14px; }
+            .taskbar-brand h1 { font-size:13px; }
+            .taskbar-brand span { display:none; }
+            .main-content { margin-top:56px; padding:12px; height:calc(100vh - 56px); }
+            .mobile-nav-dropdown { top:56px; }
+            .dash-grid { grid-template-columns:1fr; gap:10px; }
+            .stat-box { padding:16px 14px; }
+            .stat-box h3 { font-size:28px; }
+            .page-header { flex-direction:column; align-items:flex-start; gap:8px; }
+            .page-header h2 { font-size:16px; }
+            .card { padding:14px; border-radius:12px; }
+            .card-title { font-size:13px; }
+            .app-item { padding:12px 14px; flex-direction:column; align-items:flex-start; }
+            .app-info h4 { font-size:13px; }
+            .login-card { padding:24px 16px; }
+            .login-logo .icon-box { width:56px; height:56px; font-size:24px; }
+            .login-logo h1 { font-size:18px; }
+            .form-group { margin-bottom:14px; }
+            input { padding:12px 12px 12px 38px; font-size:13px; }
+            .input-wrap i { font-size:14px; left:12px; }
+            .btn { padding:12px 20px; font-size:13px; }
+            .settings-grid { gap:15px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- LOGIN -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-card">
+            <div class="login-logo">
+                <div class="icon-box"><i class="fas fa-crown"></i></div>
+                <h1>Admin Panel</h1>
+                <p>Firebase Authentication</p>
+            </div>
+            <div class="form-group"><label>Email</label><div class="input-wrap"><i class="fas fa-envelope"></i><input type="email" id="loginEmail" placeholder="admin@email.com"></div></div>
+            <div class="form-group"><label>Password</label><div class="input-wrap"><i class="fas fa-lock"></i><input type="password" id="loginPass" placeholder="Enter password"></div></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">
+                <input type="checkbox" id="rememberMe">
+                <label style="margin:0;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;color:#888;">Remember Me</label>
+            </div>
+            <div class="login-error" id="loginError"></div>
+            <button class="btn btn-primary" onclick="adminLogin()"><i class="fas fa-arrow-right"></i> SIGN IN</button>
+        </div>
+    </div>
+
+    <!-- BIG TOP TASKBAR -->
+    <div class="taskbar">
+        <div class="taskbar-left">
+            <button class="mobile-nav-toggle" onclick="toggleMobileNav()" id="mobileToggle"><i class="fas fa-bars"></i></button>
+            <div class="taskbar-brand">
+                <div class="brand-icon"><i class="fas fa-crown"></i></div>
+                <div><h1>Admin Panel</h1><span>Firebase Auth</span></div>
+            </div>
+            <div class="taskbar-nav">
+                <div class="t-nav active" onclick="switchPage('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard <span class="count" id="navTotal">0</span></div>
+                <div class="t-nav" onclick="switchPage('manage-apps')"><i class="fas fa-server"></i> Manage Apps</div>
+                <div class="t-nav" onclick="switchPage('settings')"><i class="fas fa-cog"></i> Settings</div>
+            </div>
+        </div>
+        <div class="taskbar-right">
+            <div class="tb-user" id="tbUser">
+                <div class="avatar" id="adminAvatar">A</div>
+                <div class="info">
+                    <strong id="sidebarName">Admin</strong>
+                    <p id="sidebarEmail">admin@email.com</p>
+                </div>
+                <div class="dot"></div>
+            </div>
+            <div class="tb-logout" onclick="adminLogout()" title="Logout"><i class="fas fa-sign-out-alt"></i></div>
+        </div>
+    </div>
+
+    <!-- MOBILE NAV DROPDOWN -->
+    <div class="mobile-nav-dropdown" id="mobileNav">
+        <div class="m-nav active" onclick="switchPageMobile('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard <span class="count" id="mNavTotal">0</span></div>
+        <div class="m-nav" onclick="switchPageMobile('manage-apps')"><i class="fas fa-server"></i> Manage Apps</div>
+        <div class="m-nav" onclick="switchPageMobile('settings')"><i class="fas fa-cog"></i> Settings</div>
+        <div class="divider"></div>
+        <div class="m-nav" onclick="adminLogout()" style="color:#FF6B6B;"><i class="fas fa-sign-out-alt"></i> Logout</div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content" id="mainContent">
+        <!-- DASHBOARD -->
+        <div class="page active" id="page-dashboard">
+            <div class="page-header">
+                <h2><i class="fas fa-chart-pie"></i> Dashboard</h2>
+                <div class="right">
+                    <span class="time" id="updateTime">Just now</span>
+                    <button class="refresh-btn" onclick="loadDashboard()"><i class="fas fa-sync-alt"></i></button>
+                </div>
+            </div>
+            <div class="dash-grid">
+                <div class="stat-box purple"><h3 id="statTotal">0</h3><p>Total Apps</p></div>
+                <div class="stat-box green"><h3 id="statActive">0</h3><p>Active</p></div>
+                <div class="stat-box red"><h3 id="statExpired">0</h3><p>Expired</p></div>
+            </div>
+            <div class="card">
+                <div class="card-title"><i class="fas fa-user-circle"></i> Admin Profile</div>
+                <div class="info-grid">
+                    <div class="info-item"><div class="lbl"><i class="fas fa-envelope" style="margin-right:4px;color:#B366FF;"></i> Email</div><div class="val" id="infoEmail">-</div></div>
+                    <div class="info-item"><div class="lbl"><i class="fas fa-fingerprint" style="margin-right:4px;color:#B366FF;"></i> UID</div><div class="val" id="infoUid">-</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MANAGE APPS -->
+        <div class="page" id="page-manage-apps">
+            <div class="page-header">
+                <h2><i class="fas fa-server"></i> Manage Apps</h2>
+            </div>
+            <div class="card">
+                <div class="card-title"><i class="fas fa-list"></i> All Applications</div>
+                <ul class="app-list" id="appListContainer"><li style="text-align:center;color:#555;padding:30px;"><i class="fas fa-spinner fa-pulse" style="margin-right:8px;"></i> Loading apps...</li></ul>
+            </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="page" id="page-settings">
+            <div class="page-header">
+                <h2><i class="fas fa-cog"></i> User Management</h2>
+            </div>
+            <div class="card">
+                <div class="card-title"><i class="fas fa-user-plus"></i> Add New User</div>
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                    <div class="form-group" style="margin:0;"><label>Username</label><div class="input-wrap"><i class="fas fa-user"></i><input type="text" id="newUsername" placeholder="Username"></div></div>
+                    <div class="form-group" style="margin:0;"><label>Password</label><div class="input-wrap"><i class="fas fa-lock"></i><input type="text" id="newPassword" placeholder="Password (min 4)"></div></div>
+                    <div class="form-group" style="margin:0;"><label>Device / Details</label><div class="input-wrap"><i class="fas fa-mobile-alt"></i><input type="text" id="newDevice" placeholder="e.g. Android V1"></div></div>
+                    <div class="form-group" style="margin:0;"><label>Device Limit (0 = Unlimited)</label><div class="input-wrap"><i class="fas fa-sim-card"></i><input type="number" id="newDeviceLimit" value="1" min="0" max="10" style="text-align:left;" title="0 = Unlimited"></div></div>
+                </div>
+                <div class="error-msg" id="userAddError"></div>
+                <button class="btn btn-primary" onclick="addUser()" style="margin-top:15px;width:100%;"><i class="fas fa-plus"></i> ADD USER</button>
+            </div>
+            <div class="card">
+                <div class="card-title"><i class="fas fa-users"></i> All Users <span style="margin-left:auto;font-size:12px;color:#888;" id="userCount">(0)</span></div>
+                <ul class="app-list" id="userListContainer"><li style="text-align:center;color:#555;padding:30px;"><i class="fas fa-users" style="margin-right:8px;"></i> No users added yet.</li></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT USER MODAL -->
+    <div class="modal-overlay" id="editUserModal">
+        <div class="modal-box">
+            <h3><i class="fas fa-pen" style="color:#B366FF;"></i> Edit User</h3>
+            <input type="hidden" id="editUserId">
+            <div class="form-group"><label>Username</label><input type="text" id="editUsername" placeholder="Username" style="padding-left:15px;"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="editPassword" placeholder="Password (min 4)" style="padding-left:15px;"></div>
+            <div class="form-group"><label>Device / Details</label><input type="text" id="editDevice" placeholder="e.g. Android V1" style="padding-left:15px;"></div>
+            <div class="form-group"><label>Device Limit (0 = Unlimited)</label><input type="number" id="editDeviceLimit" min="0" max="10" style="padding-left:15px;" title="0 = Unlimited"></div>
+            <div class="error-msg" id="editUserError"></div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-primary" onclick="saveEditUser()" style="flex:1;"><i class="fas fa-save"></i> SAVE</button>
+                <button class="btn" onclick="closeEditModal()" style="flex:1;background:#555;color:#fff;box-shadow:none;"><i class="fas fa-times"></i> CANCEL</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var firebaseConfig = {
+            apiKey: "AIzaSyCphT3GQWxbyVdGeRSPWhCnn3n1QD3tJR8",
+            authDomain: "prince-hacks-website.firebaseapp.com",
+            databaseURL: "https://prince-hacks-website-default-rtdb.firebaseio.com",
+            projectId: "prince-hacks-website",
+            storageBucket: "prince-hacks-website.firebasestorage.app",
+            messagingSenderId: "1035319104923",
+            appId: "1:1035319104923:web:26c7c175757aebef86fd3e"
+        };
+        firebase.initializeApp(firebaseConfig);
+        var auth = firebase.auth();
+        var db = firebase.database();
+        var users = [];
+        var usersRef = db.ref('admin_control/users');
+        var usersListener = null;
+
+        function switchPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.t-nav').forEach(n => n.classList.remove('active'));
+            document.getElementById('page-' + pageId).classList.add('active');
+            var navItems = document.querySelectorAll('.t-nav');
+            for (var i = 0; i < navItems.length; i++) {
+                if (navItems[i].getAttribute('onclick') && navItems[i].getAttribute('onclick').includes(pageId)) {
+                    navItems[i].classList.add('active');
+                    break;
+                }
+            }
+            document.getElementById('mobileNav').classList.remove('show');
+            if (pageId === 'settings') { renderUsers(); }
+        }
+
+        function switchPageMobile(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.m-nav').forEach(n => n.classList.remove('active'));
+            document.getElementById('page-' + pageId).classList.add('active');
+            var mNavs = document.querySelectorAll('.m-nav');
+            for (var i = 0; i < mNavs.length; i++) {
+                if (mNavs[i].getAttribute('onclick') && mNavs[i].getAttribute('onclick').includes(pageId)) {
+                    mNavs[i].classList.add('active');
+                    break;
+                }
+            }
+            document.getElementById('mobileNav').classList.remove('show');
+            if (pageId === 'settings') { renderUsers(); }
+        }
+
+        function toggleMobileNav() {
+            document.getElementById('mobileNav').classList.toggle('show');
+        }
+
+        function saveRemember() {
+            if (document.getElementById('rememberMe').checked) {
+                localStorage.setItem('adminRemembered', JSON.stringify({ email: document.getElementById('loginEmail').value.trim(), pass: document.getElementById('loginPass').value }));
+            } else { localStorage.removeItem('adminRemembered'); }
+        }
+
+        function loadRemember() {
+            var saved = localStorage.getItem('adminRemembered');
+            if (saved) { try { var d = JSON.parse(saved); document.getElementById('loginEmail').value = d.email || ''; document.getElementById('loginPass').value = d.pass || ''; document.getElementById('rememberMe').checked = true; } catch(e) {} }
+        }
+
+        function adminLogin() {
+            var email = document.getElementById('loginEmail').value.trim();
+            var pass = document.getElementById('loginPass').value;
+            var err = document.getElementById('loginError');
+            err.style.display = 'none';
+            if (!email || !pass) { err.textContent = 'Enter email and password!'; err.style.display = 'block'; return; }
+            saveRemember();
+            auth.signInWithEmailAndPassword(email, pass).then(function(cred) {
+                document.getElementById('loginOverlay').classList.add('hidden');
+                loadAdminInfo(cred.user);
+                loadDashboard();
+            }).catch(function(error) { err.textContent = error.message; err.style.display = 'block'; });
+        }
+
+        auth.onAuthStateChanged(function(user) {
+            if (user) {
+                document.getElementById('loginOverlay').classList.add('hidden');
+                loadAdminInfo(user);
+                loadDashboard();
+                startUsersListener();
+            }
+            else {
+                document.getElementById('loginOverlay').classList.remove('hidden');
+                loadRemember();
+                if (usersListener) { usersRef.off('value', usersListener); usersListener = null; }
+            }
+        });
+
+        function loadAdminInfo(user) {
+            var name = user.email ? user.email.split('@')[0] : 'Admin';
+            document.getElementById('sidebarName').textContent = name;
+            document.getElementById('sidebarEmail').textContent = user.email;
+            document.getElementById('adminAvatar').textContent = name.charAt(0).toUpperCase();
+            document.getElementById('infoEmail').textContent = user.email;
+            document.getElementById('infoUid').textContent = user.uid;
+        }
+
+        function loadDashboard() {
+            document.getElementById('updateTime').textContent = new Date().toLocaleTimeString('en-IN');
+            db.ref('app_control/apps').once('value', function(snapshot) {
+                var total = 0, active = 0, expired = 0, now = Date.now();
+                snapshot.forEach(function(child) {
+                    var data = child.val(); total++;
+                    (data.status === 'Expired' || (data.expiryTime > 0 && now > data.expiryTime)) ? expired++ : active++;
+                });
+                document.getElementById('statTotal').textContent = total;
+                document.getElementById('statActive').textContent = active;
+                document.getElementById('statExpired').textContent = expired;
+                document.getElementById('navTotal').textContent = total;
+                document.getElementById('mNavTotal').textContent = total;
+                loadAppsList();
+            });
+        }
+
+        function loadAppsList() {
+            var container = document.getElementById('appListContainer');
+            db.ref('app_control/apps').orderByChild('timestamp').once('value', function(snapshot) {
+                var apps = [];
+                snapshot.forEach(function(child) { var data = child.val(); data.code = child.key; apps.push(data); });
+                apps.reverse();
+                if (apps.length === 0) { container.innerHTML = '<li style="text-align:center;color:#555;padding:30px;"><i class="fas fa-inbox" style="margin-right:8px;"></i> No apps found.</li>'; return; }
+                var html = '', now = Date.now();
+                apps.forEach(function(app) {
+                    var expired = (app.status === 'Expired' || (app.expiryTime > 0 && now > app.expiryTime));
+                    var badge = expired ? 'b-expired' : 'b-active';
+                    var status = expired ? 'Expired' : 'Active';
+                    var expText = app.expiryTime > 0 ? new Date(app.expiryTime).toLocaleString('en-IN') : 'No limit';
+                    var ownerTxt = app.owner ? ' &middot; Owner: ' + app.owner : '';
+                    html += '<li class="app-item"><div class="app-info"><h4>' + app.name + ' <span class="badge ' + badge + '">' + status + '</span></h4><p>' + app.code + ' &middot; Expiry: ' + expText + ownerTxt + '</p></div></li>';
+                });
+                container.innerHTML = html;
+            });
+        }
+
+        // --- USER MANAGEMENT (Firebase) ---
+        function startUsersListener() {
+            usersListener = usersRef.on('value', function(snapshot) {
+                users = [];
+                snapshot.forEach(function(child) {
+                    var user = child.val();
+                    user._key = child.key;
+                    users.push(user);
+                });
+                // If settings page is active, re-render
+                var settingsPage = document.getElementById('page-settings');
+                if (settingsPage && settingsPage.classList.contains('active')) renderUsers();
+            });
+        }
+
+        function renderUsers() {
+            var container = document.getElementById('userListContainer');
+            document.getElementById('userCount').textContent = '(' + users.length + ')';
+            if (users.length === 0) { container.innerHTML = '<li style="text-align:center;color:#555;padding:30px;"><i class="fas fa-users" style="margin-right:8px;"></i> No users added yet.</li>'; return; }
+            var html = '';
+            users.forEach(function(user, i) {
+                var lockedCount = user.lockedDevices ? user.lockedDevices.length : 0;
+                var limitTxt = user.deviceLimit > 0 ? user.deviceLimit + ' Device' + (user.deviceLimit > 1 ? 's' : '') : 'Unlimited';
+                html += '<li class="app-item"><div class="app-info"><h4>' + user.username + ' <span class="badge b-active">Active</span></h4><p>Pass: ' + user.password + ' &middot; ' + (user.device || 'No details') + ' &middot; Limit: ' + limitTxt + (lockedCount > 0 ? ' &middot; <span style="color:#FFB300;">' + lockedCount + ' device(s) locked</span>' : '') + '</p></div><div class="app-controls" style="display:flex;gap:6px;">' +
+                    (lockedCount > 0 ? '<button class="btn-sm" onclick="resetDevice(\'' + user._key + '\')" style="background:rgba(255,179,0,0.15);color:#FFB300;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;" title="Reset Device"><i class="fas fa-unlock"></i></button>' : '') +
+                    '<button class="btn-sm" onclick="editUser(\'' + user._key + '\')" style="background:rgba(255,179,0,0.15);color:#FFB300;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;"><i class="fas fa-pen"></i></button>' +
+                    '<button class="btn-sm" onclick="deleteUser(\'' + user._key + '\')" style="background:rgba(255,76,76,0.15);color:#FF4C4C;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;"><i class="fas fa-trash"></i></button></div></li>';
+            });
+            container.innerHTML = html;
+        }
+
+        function addUser() {
+            var username = document.getElementById('newUsername').value.trim();
+            var password = document.getElementById('newPassword').value.trim();
+            var device = document.getElementById('newDevice').value.trim();
+            var err = document.getElementById('userAddError');
+            err.style.display = 'none';
+            if (!username || !password) { err.textContent = 'Username and password required!'; err.style.display = 'block'; return; }
+            if (password.length < 4) { err.textContent = 'Password min 4 characters!'; err.style.display = 'block'; return; }
+            for (var i = 0; i < users.length; i++) { if (users[i].username === username) { err.textContent = 'Username already exists!'; err.style.display = 'block'; return; } }
+            var deviceLimit = parseInt(document.getElementById('newDeviceLimit').value) || 0;
+            usersRef.push({
+                username: username,
+                password: password,
+                device: device || '',
+                deviceLimit: deviceLimit,
+                lockedDevices: [],
+                created: Date.now()
+            }).then(function() {
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('newDevice').value = '';
+                document.getElementById('newDeviceLimit').value = 1;
+                showToast('User "' + username + '" added!');
+            }).catch(function(e) { err.textContent = e.message; err.style.display = 'block'; });
+        }
+
+        function editUser(key) {
+            for (var i = 0; i < users.length; i++) {
+                if (users[i]._key === key) {
+                    var user = users[i];
+                    document.getElementById('editUserId').value = key;
+                    document.getElementById('editUsername').value = user.username;
+                    document.getElementById('editPassword').value = user.password;
+                    document.getElementById('editDevice').value = user.device || '';
+                    document.getElementById('editDeviceLimit').value = user.deviceLimit > 0 ? user.deviceLimit : 0;
+                    document.getElementById('editUserError').style.display = 'none';
+                    document.getElementById('editUserModal').classList.add('show');
+                    return;
+                }
+            }
+        }
+
+        function saveEditUser() {
+            var key = document.getElementById('editUserId').value;
+            var username = document.getElementById('editUsername').value.trim();
+            var password = document.getElementById('editPassword').value.trim();
+            var device = document.getElementById('editDevice').value.trim();
+            var deviceLimit = parseInt(document.getElementById('editDeviceLimit').value) || 0;
+            var err = document.getElementById('editUserError');
+            err.style.display = 'none';
+            if (!username || !password) { err.textContent = 'Username and password required!'; err.style.display = 'block'; return; }
+            if (password.length < 4) { err.textContent = 'Password min 4 chars!'; err.style.display = 'block'; return; }
+            for (var i = 0; i < users.length; i++) {
+                if (users[i]._key !== key && users[i].username === username) {
+                    err.textContent = 'Username already exists!'; err.style.display = 'block'; return;
+                }
+            }
+            usersRef.child(key).update({
+                username: username,
+                password: password,
+                device: device || '',
+                deviceLimit: deviceLimit
+            }).then(function() {
+                document.getElementById('editUserModal').classList.remove('show');
+                showToast('User updated!');
+            }).catch(function(e) { err.textContent = e.message; err.style.display = 'block'; });
+        }
+
+        function deleteUser(key) {
+            if (!confirm('Delete this user?')) return;
+            usersRef.child(key).remove().then(function() {
+                showToast('User deleted!');
+            });
+        }
+
+        function resetDevice(key) {
+            if (!confirm('Reset device lock for this user?')) return;
+            usersRef.child(key).update({ lockedDevices: [] }).then(function() {
+                showToast('Device reset!');
+            });
+        }
+
+        function closeEditModal() { document.getElementById('editUserModal').classList.remove('show'); }
+
+        function adminLogout() { auth.signOut().then(function() { document.getElementById('loginOverlay').classList.remove('hidden'); }); }
+
+        function showToast(msg) {
+            var t = document.createElement('div');
+            t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#00E676;color:#000;padding:14px 30px;border-radius:14px;font-weight:600;font-size:14px;box-shadow:0 15px 40px rgba(0,230,118,0.3);z-index:9999;font-family:Poppins,sans-serif;animation:fadeUp 0.3s ease;display:flex;align-items:center;gap:8px;';
+            t.innerHTML = '<i class="fas fa-check-circle"></i> ' + msg;
+            document.body.appendChild(t);
+            setTimeout(function() { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; t.style.transition = '0.4s'; setTimeout(function() { document.body.removeChild(t); }, 500); }, 2500);
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !document.getElementById('loginOverlay').classList.contains('hidden')) adminLogin();
+        });
+
+        document.addEventListener('click', function(e) {
+            var nav = document.getElementById('mobileNav');
+            var toggle = document.getElementById('mobileToggle');
+            if (nav.classList.contains('show') && !nav.contains(e.target) && !toggle.contains(e.target)) {
+                nav.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
