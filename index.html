@@ -878,21 +878,25 @@
             var javaCode = getJavaString(true, appName, newCode, expTimeMillis, uBg, uPri, uTxt, uDan, uRad, uBtnRad, uDim, uBlur, uBw, uBc, tag, logo, title, sub, msg, w1, w2, w3, btnTxt, javaActionCode);
 
             currentOnlineCode = javaCode;
+            var loggedUser = sessionStorage.getItem('panelLoggedUser') || '';
 
-            db.ref('app_control/apps/' + newCode).set({ name: appName, status: "Active", date: new Date().toLocaleDateString("en-GB"), timestamp: Date.now(), expiryTime: expTimeMillis, javacode: javaCode }).then(() => {
+            db.ref('app_control/apps/' + newCode).set({ name: appName, status: "Active", date: new Date().toLocaleDateString("en-GB"), timestamp: Date.now(), expiryTime: expTimeMillis, javacode: javaCode, owner: loggedUser }).then(() => {
                 document.getElementById('on-outputBox').style.display = "block"; document.getElementById('on-appName').value = ""; showToast("Online Code Ready!");
             });
         }
 
         // --- FETCH AND CHECK ONLINE EXPIRY LIVE ---
         db.ref('app_control/apps').on('value', (snapshot) => {
-            onlineAppsArray = []; var total = 0, active = 0, expired = 0; let now = Date.now();
+            onlineAppsArray = []; var userTotal = 0, userActive = 0, userExpired = 0; let now = Date.now();
+            var loggedUser = sessionStorage.getItem('panelLoggedUser') || '';
             snapshot.forEach((child) => { 
-                var data = child.val(); data.code = child.key; onlineAppsArray.push(data); total++; 
+                var data = child.val(); data.code = child.key; onlineAppsArray.push(data);
+                if (data.owner && data.owner !== loggedUser) { return; }
+                userTotal++;
                 let isTimeExpired = (data.expiryTime > 0 && now > data.expiryTime);
-                if(data.status === "Expired" || isTimeExpired) { expired++; } else { active++; }
+                if(data.status === "Expired" || isTimeExpired) { userExpired++; } else { userActive++; }
             });
-            document.getElementById('stat-on-total').innerText = total; document.getElementById('stat-on-active').innerText = active; document.getElementById('stat-on-expired').innerText = expired;
+            document.getElementById('stat-on-total').innerText = userTotal; document.getElementById('stat-on-active').innerText = userActive; document.getElementById('stat-on-expired').innerText = userExpired;
             onlineAppsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); renderOnList();
         });
 
@@ -901,12 +905,14 @@
         function renderOnList() {
             var listContainer = document.getElementById('on-appListContainer'); var searchQuery = document.getElementById('on-searchInput').value.toLowerCase(); listContainer.innerHTML = '';
             let now = Date.now();
+            var loggedUser = sessionStorage.getItem('panelLoggedUser') || '';
             var filteredData = onlineAppsArray.filter(app => { 
                 let isTimeExpired = (app.expiryTime > 0 && now > app.expiryTime);
                 let displayStatus = (app.status === "Expired" || isTimeExpired) ? "Expired" : "Active";
                 let matchesSearch = ((app.name && app.name.toLowerCase().includes(searchQuery)) || app.code.toLowerCase().includes(searchQuery));
                 let matchesFilter = (currentOnFilter === 'All') || (displayStatus === currentOnFilter);
-                return matchesSearch && matchesFilter; 
+                let matchesOwner = !app.owner || app.owner === loggedUser;
+                return matchesSearch && matchesFilter && matchesOwner; 
             });
             
             if(filteredData.length === 0) return listContainer.innerHTML = '<li style="text-align: center; color: #555; padding: 20px;">No apps found.</li>';
