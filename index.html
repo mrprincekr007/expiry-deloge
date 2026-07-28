@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deloge Admin Panel (Auto-Save)</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #0B0514; --panel-bg: #1A0F2E; --primary: #B366FF; --primary-hover: #9D4EDD; 
+            --text-light: #C792EA; --text-white: #FFFFFF; --danger: #FF4C4C; --success: #00E676; 
+            --warning: #FFB300; --dark-gray: #150A21;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; outline: none; -webkit-tap-highlight-color: transparent;}
+        body { background-color: var(--bg-color); color: var(--text-white); display: flex; height: 100vh; overflow: hidden; }
+
+        /* Sidebar & Overlay */
+        .sidebar { width: 280px; background-color: var(--panel-bg); height: 100vh; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: fixed; left: -280px; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow-y: auto;}
+        .sidebar.active { left: 0; }
+        .sidebar-header { padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(157, 78, 221, 0.2); margin-bottom: 15px; position: sticky; top: 0; background: var(--panel-bg); z-index: 10;}
+        .sidebar-header h3 { color: var(--primary); font-size: 18px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 10px;}
+        .close-menu-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; transition: 0.3s; }
+        .close-menu-btn:hover { color: var(--danger); transform: scale(1.1); }
+        
+        .menu-category { padding: 15px 25px 5px; color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+        .menu-item { padding: 12px 25px; display: flex; align-items: center; color: var(--text-light); text-decoration: none; font-size: 14px; cursor: pointer; transition: 0.3s; border-left: 4px solid transparent; font-weight: 500; margin: 2px 10px; border-radius: 8px; }
+        .menu-item:hover, .menu-item.active { background-color: rgba(157, 78, 221, 0.15); color: var(--text-white); border-left-color: var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.2); transform: translateX(5px); }
+        .menu-item i { margin-right: 15px; width: 20px; text-align: center; font-size: 16px; }
+        
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(3px); z-index: 999; display: none; opacity: 0; transition: opacity 0.4s; }
+        .overlay.active { display: block; opacity: 1; }
+
+        /* Main Content */
+        .main-content { flex: 1; padding: 25px; margin-left: 0; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); overflow-y: auto; width: 100%; max-width: 1600px; margin: 0 auto; scroll-behavior: smooth; }
+        @media (min-width: 769px) { .sidebar { left: 0; } .overlay { display: none !important; } .main-content { margin-left: 280px; padding: 35px 40px; } .close-menu-btn { display: none; } }
+        .topbar { display: flex; align-items: center; margin-bottom: 30px; animation: fadeInDown 0.5s ease; }
+        .menu-btn { background: none; border: none; color: var(--text-white); font-size: 24px; cursor: pointer; margin-right: 20px; transition: 0.3s; }
+        .menu-btn:hover { color: var(--primary); }
+        @media (min-width: 769px) { .menu-btn { display: none; } }
+        .page-title { font-size: 22px; font-weight: 700; color: var(--text-light); letter-spacing: 2px; text-transform: uppercase; }
+
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        
+        .page { display: none; }
+        .page.active { display: block; animation: slideUpFade 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .card { background-color: var(--panel-bg); padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.05); }
+
+        /* Dashboard */
+        .dash-title { color: var(--primary); font-size: 16px; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px solid rgba(157, 78, 221, 0.2); padding-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+        .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 35px; }
+        .stat-box { padding: 25px 20px; border-radius: 16px; text-align: center; box-shadow: 0 8px 25px rgba(0,0,0,0.3); transition: 0.3s; position: relative; overflow: hidden; }
+        .stat-box.online { background: linear-gradient(135deg, #3c096c, #5a189a); }
+        .stat-box.offline { background: linear-gradient(135deg, #3c096c, #5a189a); }
+        .stat-box.danger { background: linear-gradient(135deg, #FF416C, #FF4B2B); }
+        .stat-box h3 { font-size: 40px; margin: 5px 0; font-weight: 700; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .stat-box p { color: rgba(255,255,255,0.85); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+
+        /* Forms */
+        .category-box { background: rgba(0,0,0,0.2); border: 1px solid rgba(157, 78, 221, 0.15); padding: 20px; border-radius: 12px; margin-bottom: 20px; transition: 0.3s; }
+        .category-box:hover { border-color: rgba(157, 78, 221, 0.4); background: rgba(0,0,0,0.3); }
+        .category-title { color: var(--primary); font-size: 13px; font-weight: 600; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px solid rgba(157, 78, 221, 0.2); padding-bottom: 8px; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 11px; color: #aaa; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        input, textarea, select { width: 100%; padding: 14px 15px; background: var(--dark-gray); border: 1px solid rgba(157, 78, 221, 0.2); border-radius: 8px; color: white; font-size: 14px; transition: 0.3s; font-family: 'Poppins', sans-serif; color-scheme: dark; }
+        input[type="number"] { padding: 12px 15px; }
+        input[type="color"] { padding: 5px; height: 50px; cursor: pointer; border-radius: 8px; }
+        input:focus, textarea:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 12px rgba(157, 78, 221, 0.3); outline: none; background: rgba(0,0,0,0.5); }
+        textarea { resize: vertical; min-height: 80px; }
+        
+        button.btn { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 1px; font-size: 14px; box-shadow: 0 5px 15px rgba(179, 102, 255, 0.3); display: flex; justify-content: center; align-items: center; gap: 10px;}
+        button.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(179, 102, 255, 0.5); }
+        button.btn:active { transform: scale(0.98); }
+        button.btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); box-shadow: none; }
+        button.btn-outline:hover { background: rgba(157, 78, 221, 0.1); }
+
+        .generate-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 40px; }
+        @media (max-width: 1100px) { .generate-grid { grid-template-columns: 1fr; gap: 30px; } }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; gap: 0; } }
+
+        .custom-select { position: relative; width: 100%; user-select: none; }
+        .select-btn { width: 100%; padding: 14px 15px; background: var(--dark-gray); border: 1px solid rgba(157, 78, 221, 0.2); border-radius: 8px; color: white; font-size: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.3s;}
+        .select-dropdown { position: absolute; top: calc(100% + 5px); left: 0; width: 100%; background: #2A1B40; border: 1px solid rgba(157, 78, 221, 0.5); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 100; overflow: hidden; opacity: 0; visibility: hidden; transform: translateY(-10px); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .custom-select.active .select-dropdown { opacity: 1; visibility: visible; transform: translateY(0); }
+        .select-option { padding: 14px 15px; cursor: pointer; transition: 0.2s; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .select-option:hover { background: rgba(157, 78, 221, 0.2); color: var(--primary); padding-left: 20px; }
+
+        /* Inline Output Box */
+        .code-output-container { background: var(--dark-gray); border: 1px solid var(--primary); border-radius: 12px; padding: 20px; margin-top: 20px; display: none; animation: slideUpFade 0.4s forwards; text-align: center; }
+        .code-output-container h4 { color: var(--primary); margin-bottom: 15px; font-size: 16px; }
+        .code-output-container pre { display: none !important; } 
+
+        /* EXACT IMAGE PREVIEW UI */
+        @keyframes pulseTag { 0% { transform: scale(1); } 50% { transform: scale(1.06); } 100% { transform: scale(1); } }
+        
+        .preview-wrapper { background: #1C1C1E; padding: 25px 22px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); font-family: sans-serif; text-align: left; width: 100%; max-width: 340px; margin: 0 auto; position: sticky; top: 30px; transition: 0.3s; border: 0px solid transparent; }
+        .pv-top-container { text-align: center; margin-bottom: 15px; padding-top: 5px; } 
+        .pv-top-tag { display: inline-block; border: 1px solid #FF4C4C; color: #FF4C4C; padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: bold; background: rgba(255,76,76,0.1); animation: pulseTag 1.2s infinite ease-in-out; transition: 0.3s; }
+        .pv-header { display: flex; align-items: center; margin-bottom: 15px; }
+        .pv-logo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px; border: 2px solid #333; background: #2A2A2C; display: flex; align-items: center; justify-content: center; font-size: 20px; color:#aaa; }
+        .pv-title { color: white; font-size: 16px; font-weight: bold; margin-bottom: 2px; transition: 0.3s; line-height: 1.2;}
+        .pv-subtitle { color: #B366FF; font-size: 11px; font-weight: bold; transition: 0.3s;}
+        .pv-body { color: #A0A0A0; font-size: 13px; margin-bottom: 15px; line-height: 1.4; white-space: pre-wrap; transition: 0.3s;} 
+        .pv-whatsnew-box { background: #2A2A2C; border-radius: 12px; padding: 18px; margin-bottom: 20px; border: 1px solid transparent; transition: 0.3s;}
+        .pv-wn-title { color: #B366FF; font-size: 12px; font-weight: bold; margin-bottom: 10px; transition: 0.3s;}
+        .pv-bullet { color: white; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; transition: 0.3s;}
+        .pv-bullet:last-child { margin-bottom: 0; }
+        .pv-button { background: #B366FF; color: white; text-align: center; padding: 12px; border-radius: 12px; font-weight: bold; font-size: 14px; width: 100%; cursor: pointer; letter-spacing: 1px; transition: 0.3s;}
+
+        /* Manage Lists */
+        .search-box { margin-bottom: 20px; position: relative; }
+        .search-box input { padding-left: 45px; }
+        .search-box i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-light); }
+        .filter-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-btn { padding: 8px 16px; background: var(--dark-gray); border: 1px solid rgba(255,255,255,0.1); color: #888; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; transition: 0.3s; }
+        .filter-btn.active { background: rgba(157, 78, 221, 0.2); color: var(--text-white); border-color: var(--primary); }
+
+        .app-list { list-style: none; }
+        .app-item { background: var(--dark-gray); border: 1px solid rgba(255,255,255,0.05); padding: 18px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; transition: 0.3s; }
+        .app-item:hover { border-color: rgba(157, 78, 221, 0.4); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .app-info h4 { color: var(--text-white); font-size: 15px; margin-bottom: 6px; font-weight: 600; }
+        .app-info p { font-size: 11px; color: #777; letter-spacing: 0.5px; }
+        .app-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn-small { width: 38px; height: 38px; border-radius: 8px; border: none; cursor: pointer; color: white; font-size: 15px; transition: 0.3s; display: flex; justify-content: center; align-items: center; }
+        .btn-view { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+        .btn-view:hover { background: #3498db; color: white; }
+        .btn-edit { background: rgba(255, 179, 0, 0.2); color: var(--warning); }
+        .btn-edit:hover { background: var(--warning); color: #000; }
+        .btn-delete { background: rgba(255, 76, 76, 0.2); color: #FF4C4C; }
+        .btn-delete:hover { background: #FF4C4C; color: white; }
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; margin-left: 8px; text-transform: uppercase; }
+        .b-active { background: rgba(0, 230, 118, 0.1); color: var(--success); border: 1px solid rgba(0, 230, 118, 0.3); }
+        .b-expired { background: rgba(255, 76, 76, 0.1); color: var(--danger); border: 1px solid rgba(255, 76, 76, 0.3); }
+
+        /* FULL SCREEN PREVIEW MODAL */
+        #fullPreviewModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 3000; justify-content: center; align-items: center; padding: 20px; transition: 0.4s; }
+        #fullPreviewModal.show { display: flex; }
+        .close-preview-btn { position: absolute; bottom: 40px; padding: 12px 30px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 30px; font-size: 14px; font-weight: bold; cursor: pointer; backdrop-filter: blur(5px); z-index: 3001;}
+        .close-preview-btn:hover { background: white; color: black; }
+
+        /* OTHER MODALS */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center; padding: 10px; opacity: 0; transition: 0.3s; }
+        .modal.show { display: flex; opacity: 1; }
+        .modal-content { background: var(--panel-bg); padding: 25px; border-radius: 16px; width: 95%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; position: relative; border: 1px solid rgba(157, 78, 221, 0.5); box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        .modal-close { position: absolute; top: 15px; right: 20px; font-size: 28px; color: #aaa; cursor: pointer; transition: 0.3s; }
+        .modal-close:hover { color: white; }
+        .modal-header { margin-bottom: 15px; padding-right: 30px; }
+        .modal-header h3 { color: var(--primary); font-size: 20px; }
+        .modal-header p { font-size: 12px; color: #888; }
+        .modal pre { background: var(--bg-color); padding: 20px; border-radius: 12px; overflow-y: auto; overflow-x: hidden; flex: 1; color: #A8FF78; font-size: 13px; margin: 15px 0; border: 1px solid rgba(255,255,255,0.05); white-space: pre-wrap; word-wrap: break-word; display: block !important;}
+        
+        .toast { position: fixed; bottom: -80px; left: 50%; transform: translateX(-50%); background: var(--success); color: #000; padding: 12px 25px; border-radius: 30px; font-weight: 600; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 9999; display: flex; align-items: center; gap: 10px; }
+        .toast.show { bottom: 30px; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN OVERLAY -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-card">
+            <div class="login-logo"><i class="fas fa-user-lock"></i><h1>USER LOGIN</h1><p>Enter credentials provided by admin</p></div>
+            <div id="loginFormContainer">
+                <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="Enter username"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="loginPass" placeholder="Enter password"></div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:15px;">
+                    <input type="checkbox" id="savePass" style="width:auto;accent-color:#B366FF;cursor:pointer;">
+                    <label style="margin:0;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;color:#aaa;">Save Password</label>
+                </div>
+                <div class="login-error" id="loginError">Invalid credentials!</div>
+                <button class="btn" onclick="userLogin()"><i class="fas fa-arrow-right"></i> LOGIN</button>
+            </div>
+        </div>
+    </div>
+    <style>
+        .login-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:#0B0514; z-index:99999; display:flex; justify-content:center; align-items:center; padding:20px; }
+        .login-overlay.hidden { display:none; }
+        .login-card { background:#1A0F2E; padding:40px 35px; border-radius:20px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,0.6); border:1px solid rgba(179,102,255,0.15); animation:fadeUp 0.5s ease; }
+        .login-logo { text-align:center; margin-bottom:25px; }
+        .login-logo i { font-size:45px; color:#B366FF; }
+        .login-logo h1 { color:white; font-size:20px; margin-top:8px; font-weight:700; }
+        .login-logo p { color:#888; font-size:12px; margin-top:4px; }
+        .login-error { color:#FF4C4C; font-size:12px; display:none; margin-bottom:12px; text-align:center; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+    </style>
+
+    <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+
+    <!-- 8 MENUS SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-crown"></i> DELOGE ADMIN</h3>
+            <button class="close-menu-btn" onclick="toggleMenu()"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <div class="menu-category">MAIN</div>
+        <a class="menu-item active" onclick="switchPage('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        
+        <div class="menu-category" style="color:var(--primary);">ONLINE API SYSTEM</div>
+        <a class="menu-item" onclick="switchPage('gen-on')"><i class="fas fa-wifi"></i> Generate Online</a>
+        <a class="menu-item" onclick="switchPage('man-on')"><i class="fas fa-server"></i> Manage Online Apps</a>
+        <a class="menu-item" onclick="switchPage('ui-on')"><i class="fas fa-palette"></i> Manage UI (Online)</a>
+        
+        <div class="menu-category" style="color:var(--primary);">OFFLINE LOCAL SYSTEM</div>
+        <a class="menu-item" onclick="switchPage('gen-off')"><i class="fas fa-power-off"></i> Generate Offline</a>
+        <a class="menu-item" onclick="switchPage('man-off')"><i class="fas fa-history"></i> Offline History</a>
+        <a class="menu-item" onclick="switchPage('ui-off')"><i class="fas fa-paint-brush"></i> Manage UI (Offline)</a>
+        
+        <div class="menu-category" style="color:var(--primary);">ACCOUNT</div>
+        <a class="menu-item" onclick="switchPage('settings')"><i class="fas fa-cog"></i> Settings</a>
+        <a class="menu-item" onclick="userLogout()" style="color:var(--danger);"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        
+        <div style="height: 30px;"></div>
+    </div>
+
+    <div class="main-content" id="mainContent">
+        <div class="topbar">
+            <button class="menu-btn" onclick="toggleMenu()"><i class="fas fa-bars"></i></button>
+            <div class="page-title" id="pageTitle">DASHBOARD</div>
+        </div>
+
+        <!-- 1. DASHBOARD -->
+        <div class="page active" id="page-dashboard">
+            <div class="dash-title"><i class="fas fa-wifi"></i> Online Apps (Firebase)</div>
+            <div class="dash-grid">
+                <div class="stat-box online"><p>Total Codes</p><h3 id="stat-on-total">0</h3></div>
+                <div class="stat-box online"><p>Active</p><h3 id="stat-on-active">0</h3></div>
+                <div class="stat-box danger"><p>Expired</p><h3 id="stat-on-expired">0</h3></div>
+            </div>
+
+            <div class="dash-title" style="margin-top: 40px;"><i class="fas fa-power-off"></i> Offline Apps (Local Timer)</div>
+            <div class="dash-grid">
+                <div class="stat-box offline"><p>Total Generated</p><h3 id="stat-off-total">0</h3></div>
+                <div class="stat-box offline"><p>Active Timer</p><h3 id="stat-off-active">0</h3></div>
+                <div class="stat-box danger"><p>Expired Locked</p><h3 id="stat-off-expired">0</h3></div>
+            </div>
+        </div>
+
+        <!-- 2. GENERATE ONLINE -->
+        <div class="page" id="page-gen-on">
+            <div class="generate-grid">
+                <div class="card" style="margin-bottom: 0;">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;"><i class="fas fa-cloud-upload-alt"></i> Build Online Code</h3>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-info-circle"></i> Basic Info</div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom:0;"><label>App Name</label><input type="text" id="on-appName" placeholder="e.g. Mod V1"></div>
+                            <div class="form-group" style="margin-bottom:0;"><label>Auto Expiry Time</label><input type="datetime-local" id="on-expiryDate"></div>
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-image"></i> Header Setup</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Top Tag</label><input type="text" id="on-topTag" value="⚠️ Required Update" oninput="updateOnPreview()"></div>
+                            <div class="form-group"><label>Logo URL (Leave blank for default)</label><input type="url" id="on-logoUrl" placeholder="Leave empty for Default Logo" oninput="updateOnPreview()"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Main Title</label><input type="text" id="on-popTitle" value="New Update Available! 🚀" oninput="updateOnPreview()"></div>
+                            <div class="form-group"><label>Subtitle</label><input type="text" id="on-subTitle" value="Version 2.0.0" oninput="updateOnPreview()"></div>
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-align-left"></i> Messages</div>
+                        <div class="form-group"><label>Body Message</label><textarea id="on-popMsg" rows="3" oninput="updateOnPreview()">We've added new features and fixed bugs.&#10;Update now!</textarea></div>
+                        <label>What's New Points</label>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <input type="text" id="on-wn1" value="✅ New UI design" oninput="updateOnPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="on-wn2" value="🐛 Bug fixes" oninput="updateOnPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="on-wn3" value="⚡ Performance improvements" oninput="updateOnPreview()">
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-mouse-pointer"></i> Button Action</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Button Text</label><input type="text" id="on-btnText" value="UPDATE NOW" oninput="updateOnPreview()"></div>
+                            <div class="form-group">
+                                <label>Action</label>
+                                <div class="custom-select" id="on-actionSel" onclick="toggleDropdown('on-actionDropdown')">
+                                    <div class="select-btn"><span id="on-actionTxt">Open URL</span><i class="fas fa-chevron-down"></i></div>
+                                    <div class="select-dropdown" id="on-actionDropdown">
+                                        <div class="select-option" onclick="selectAction('link', 'Open URL', 'on')">Open URL</div>
+                                        <div class="select-option" onclick="selectAction('exit', 'Close App', 'on')">Close App</div>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="on-btnAction" value="link">
+                            </div>
+                        </div>
+                        <div class="form-group" id="on-linkContainer" style="margin-bottom:0;"><label>URL Link</label><input type="url" id="on-linkUrl" placeholder="https://t.me/channel"></div>
+                    </div>
+                    
+                    <button class="btn" onclick="generateOnlineCode()"><i class="fas fa-magic"></i> GENERATE ONLINE CODE</button>
+                    
+                    <!-- INLINE OUTPUT (Only Copy Button) -->
+                    <div class="code-output-container" id="on-outputBox">
+                        <h4><i class="fas fa-check-circle"></i> Success! Online Java Generated.</h4>
+                        <pre id="on-codeResult"></pre>
+                        <button class="btn" onclick="copyInlineCode('on')"><i class="fas fa-copy"></i> COPY JAVA CODE</button>
+                    </div>
+                </div>
+                
+                <div>
+                    <label style="margin-bottom: 15px; display:block; text-align: center;">Live UI Preview</label>
+                    <div class="preview-wrapper" id="pv-on-wrapper">
+                        <div class="pv-top-container"><span class="pv-top-tag" id="pv-on-tag">⚠️ Required Update</span></div>
+                        <div class="pv-header">
+                            <img src="" id="pv-on-logo" class="pv-logo">
+                            <div><div class="pv-title" id="pv-on-title">Title</div><div class="pv-subtitle" id="pv-on-subtitle">Sub</div></div>
+                        </div>
+                        <div class="pv-body" id="pv-on-body">Msg</div>
+                        <div class="pv-whatsnew-box" id="pv-on-box">
+                            <div class="pv-wn-title" id="pv-on-wntitle">What's New</div>
+                            <div class="pv-bullet" id="pv-on-wn1">1</div><div class="pv-bullet" id="pv-on-wn2">2</div><div class="pv-bullet" id="pv-on-wn3">3</div>
+                        </div>
+                        <div class="pv-button" id="pv-on-btn">BTN</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. MANAGE ONLINE -->
+        <div class="page" id="page-man-on">
+            <div class="card" style="background: transparent; border: none; box-shadow: none; padding: 0;">
+                <div class="search-box"><i class="fas fa-search"></i><input type="text" id="on-searchInput" placeholder="Search Online Apps..." onkeyup="renderOnList()"></div>
+                <div class="filter-container">
+                    <button class="filter-btn active" onclick="setOnFilter('All', this)">All Apps</button>
+                    <button class="filter-btn" onclick="setOnFilter('Active', this)">Active Only</button>
+                    <button class="filter-btn" onclick="setOnFilter('Expired', this)">Expired Only</button>
+                </div>
+                <ul class="app-list" id="on-appListContainer"><li style="text-align: center; color: #555; padding: 20px;">Loading...</li></ul>
+            </div>
+        </div>
+
+        <!-- 4. MANAGE UI ONLINE (ADVANCED) -->
+        <div class="page" id="page-ui-on">
+            <div class="card">
+                <h3 style="color:var(--primary); margin-bottom: 20px;"><i class="fas fa-palette"></i> Online UI Customization</h3>
+                
+                <!-- 10 THEME SELECTOR -->
+                <div class="form-group" style="margin-bottom: 30px;">
+                    <label style="color:var(--primary); font-size:13px;">★ Select a Premium Theme (10 Styles)</label>
+                    <select id="onThemeSelect" onchange="applyThemePreset('on', this.value)" style="border-color:var(--primary); font-weight:bold;">
+                        <option value="1">1. Default Purple Pro</option>
+                        <option value="2">2. Hacker / Neon Green</option>
+                        <option value="3">3. Light & Clean Mode</option>
+                        <option value="4">4. Cyberpunk Pink</option>
+                        <option value="5">5. Deep Red / Danger</option>
+                        <option value="6">6. Ocean Blue Glass</option>
+                        <option value="7">7. Luxury Gold</option>
+                        <option value="8">8. Dark Forest</option>
+                        <option value="9">9. High Contrast Outline</option>
+                        <option value="10">10. Minimal Soft Pastel</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group"><label>Background Color</label><input type="color" id="onUiBg" value="#1c1c1e" oninput="applyOnUI()"></div>
+                    <div class="form-group"><label>Primary/Button Color</label><input type="color" id="onUiPrimary" value="#B366FF" oninput="applyOnUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Main Text Color</label><input type="color" id="onUiText" value="#ffffff" oninput="applyOnUI()"></div>
+                    <div class="form-group"><label>Danger/Tag Color</label><input type="color" id="onUiDanger" value="#ff4c4c" oninput="applyOnUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Border Thickness (0 for none)</label><input type="number" id="onUiBorderW" value="0" oninput="applyOnUI()"></div>
+                    <div class="form-group"><label>Border Color</label><input type="color" id="onUiBorderC" value="#ffffff" oninput="applyOnUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Popup Corner Radius</label><input type="number" id="onUiRadius" value="60" oninput="applyOnUI()"></div>
+                    <div class="form-group"><label>Button Radius</label><input type="number" id="onUiBtnRadius" value="30" oninput="applyOnUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Background Dim (0.0 to 1.0)</label><input type="number" step="0.05" id="onUiDim" value="0.25" oninput="applyOnUI()"></div>
+                    <div class="form-group"><label>Blur Radius (1 to 100)</label><input type="number" id="onUiBlur" value="25" oninput="applyOnUI()"></div>
+                </div>
+                
+                <button class="btn btn-outline" style="margin-bottom: 15px;" onclick="showFullScreenPreview('on')"><i class="fas fa-eye"></i> 100% FULL SCREEN PREVIEW</button>
+                <button class="btn" style="margin-bottom: 15px;" onclick="showToast('Online UI Saved!')"><i class="fas fa-save"></i> SAVE ONLINE UI</button>
+                <button class="btn" style="background: transparent; border: 1px solid #888; color:#aaa; box-shadow:none;" onclick="applyThemePreset('on', '1')"><i class="fas fa-undo"></i> RESET TO DEFAULT</button>
+            </div>
+        </div>
+
+        <!-- 5. GENERATE OFFLINE -->
+        <div class="page" id="page-gen-off">
+            <div class="generate-grid">
+                <div class="card" style="margin-bottom: 0;">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;"><i class="fas fa-power-off"></i> Build Offline Code</h3>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-info-circle"></i> App Info & Timer</div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom:0;"><label>App Name</label><input type="text" id="off-appName" placeholder="e.g. Mod V2"></div>
+                            <div class="form-group" style="margin-bottom:0;"><label>Auto-Expire Time (Required)</label><input type="datetime-local" id="off-expiryDate"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-image"></i> Header Setup</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Top Tag</label><input type="text" id="off-topTag" value="⚠️ Required Update" oninput="updateOffPreview()"></div>
+                            <div class="form-group"><label>Logo URL (Leave blank for default)</label><input type="url" id="off-logoUrl" placeholder="Leave empty for Default Logo" oninput="updateOffPreview()"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Main Title</label><input type="text" id="off-popTitle" value="New Update Available! 🚀" oninput="updateOffPreview()"></div>
+                            <div class="form-group"><label>Subtitle</label><input type="text" id="off-subTitle" value="Version 2.0.0" oninput="updateOffPreview()"></div>
+                        </div>
+                    </div>
+
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-align-left"></i> Messages</div>
+                        <div class="form-group"><label>Body Message</label><textarea id="off-popMsg" rows="3" oninput="updateOffPreview()">We've added new features and fixed bugs.&#10;Update now!</textarea></div>
+                        <label>What's New Points</label>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <input type="text" id="off-wn1" value="✅ New UI design" oninput="updateOffPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="off-wn2" value="🐛 Bug fixes" oninput="updateOffPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="off-wn3" value="⚡ Performance improvements" oninput="updateOffPreview()">
+                        </div>
+                    </div>
+
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-mouse-pointer"></i> Button Action</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Button Text</label><input type="text" id="off-btnText" value="UPDATE NOW" oninput="updateOffPreview()"></div>
+                            <div class="form-group">
+                                <label>Action</label>
+                                <div class="custom-select" id="off-actionSel" onclick="toggleDropdown('off-actionDropdown')">
+                                    <div class="select-btn"><span id="off-actionTxt">Open URL</span><i class="fas fa-chevron-down"></i></div>
+                                    <div class="select-dropdown" id="off-actionDropdown">
+                                        <div class="select-option" onclick="selectAction('link', 'Open URL', 'off')">Open URL</div>
+                                        <div class="select-option" onclick="selectAction('exit', 'Close App', 'off')">Close App</div>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="off-btnAction" value="link">
+                            </div>
+                        </div>
+                        <div class="form-group" id="off-linkContainer" style="margin-bottom:0;"><label>URL Link</label><input type="url" id="off-linkUrl" placeholder="https://t.me/channel"></div>
+                    </div>
+                    
+                    <button class="btn" onclick="generateOfflineCode()"><i class="fas fa-cogs"></i> GENERATE OFFLINE CODE</button>
+                    
+                    <!-- INLINE OUTPUT OFFLINE -->
+                    <div class="code-output-container" id="off-outputBox">
+                        <h4><i class="fas fa-check-circle"></i> Success! Offline Java Generated.</h4>
+                        <pre id="off-codeResult"></pre>
+                        <button class="btn" onclick="copyInlineCode('off')"><i class="fas fa-copy"></i> COPY JAVA CODE</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="margin-bottom: 15px; display:block; text-align: center;">Live Preview (Offline UI)</label>
+                    <div class="preview-wrapper" id="pv-off-wrapper">
+                        <div class="pv-top-container"><span class="pv-top-tag" id="pv-off-tag">⚠️ Required Update</span></div>
+                        <div class="pv-header">
+                            <img src="" id="pv-off-logo" class="pv-logo">
+                            <div><div class="pv-title" id="pv-off-title">Title</div><div class="pv-subtitle" id="pv-off-subtitle">Sub</div></div>
+                        </div>
+                        <div class="pv-body" id="pv-off-body">Msg</div>
+                        <div class="pv-whatsnew-box" id="pv-off-box">
+                            <div class="pv-wn-title" id="pv-off-wntitle">What's New</div>
+                            <div class="pv-bullet" id="pv-off-wn1">1</div><div class="pv-bullet" id="pv-off-wn2">2</div><div class="pv-bullet" id="pv-off-wn3">3</div>
+                        </div>
+                        <div class="pv-button" id="pv-off-btn">BTN</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. MANAGE OFFLINE -->
+        <div class="page" id="page-man-off">
+            <div class="card" style="background: transparent; border: none; box-shadow: none; padding: 0;">
+                <div class="search-box"><i class="fas fa-search"></i><input type="text" id="off-searchInput" placeholder="Search Offline History..." onkeyup="renderOffList()"></div>
+                <ul class="app-list" id="off-appListContainer"><li style="text-align: center; color: #555; padding: 20px;">No offline codes yet.</li></ul>
+            </div>
+        </div>
+
+        <!-- 7. SETTINGS / CHANGE CREDENTIALS -->
+        <div class="page" id="page-settings">
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <h3 style="color:var(--primary); margin-bottom: 20px;"><i class="fas fa-cog"></i> Account Settings</h3>
+                <div class="form-group"><label>Current Username</label><input type="text" id="settingsCurUser" disabled style="opacity:0.7;"></div>
+                <div class="form-group"><label>Current Password</label><input type="password" id="settingsOldPass" placeholder="Enter current password"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>New Username</label><input type="text" id="settingsNewUser" placeholder="New username"></div>
+                    <div class="form-group"><label>New Password</label><input type="password" id="settingsNewPass" placeholder="New password (min 4 chars)"></div>
+                </div>
+                <div id="settingsMsg" style="color:#00E676; font-size:13px; margin-bottom:12px; display:none;"></div>
+                <button class="btn" onclick="changeUserCredentials()"><i class="fas fa-save"></i> SAVE CHANGES</button>
+            </div>
+        </div>
+
+        <!-- 8. MANAGE UI OFFLINE (ADVANCED) -->
+        <div class="page" id="page-ui-off">
+            <div class="card">
+                <h3 style="color:var(--primary); margin-bottom: 20px;"><i class="fas fa-paint-brush"></i> Offline UI Customization</h3>
+                
+                <div class="form-group" style="margin-bottom: 30px;">
+                    <label style="color:var(--primary); font-size:13px;">★ Select a Premium Theme (10 Styles)</label>
+                    <select id="offThemeSelect" onchange="applyThemePreset('off', this.value)" style="border-color:var(--primary); font-weight:bold;">
+                        <option value="1">1. Default Purple Pro</option>
+                        <option value="2">2. Hacker / Neon Green</option>
+                        <option value="3">3. Light & Clean Mode</option>
+                        <option value="4">4. Cyberpunk Pink</option>
+                        <option value="5">5. Deep Red / Danger</option>
+                        <option value="6">6. Ocean Blue Glass</option>
+                        <option value="7">7. Luxury Gold</option>
+                        <option value="8">8. Dark Forest</option>
+                        <option value="9">9. High Contrast Outline</option>
+                        <option value="10">10. Minimal Soft Pastel</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group"><label>Background Color</label><input type="color" id="offUiBg" value="#1c1c1e" oninput="applyOffUI()"></div>
+                    <div class="form-group"><label>Primary/Button Color</label><input type="color" id="offUiPrimary" value="#B366FF" oninput="applyOffUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Main Text Color</label><input type="color" id="offUiText" value="#ffffff" oninput="applyOffUI()"></div>
+                    <div class="form-group"><label>Danger/Tag Color</label><input type="color" id="offUiDanger" value="#ff4c4c" oninput="applyOffUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Border Thickness (0 for none)</label><input type="number" id="offUiBorderW" value="0" oninput="applyOffUI()"></div>
+                    <div class="form-group"><label>Border Color</label><input type="color" id="offUiBorderC" value="#ffffff" oninput="applyOffUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Popup Corner Radius</label><input type="number" id="offUiRadius" value="60" oninput="applyOffUI()"></div>
+                    <div class="form-group"><label>Button Radius</label><input type="number" id="offUiBtnRadius" value="30" oninput="applyOffUI()"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Background Dim (0.0 to 1.0)</label><input type="number" step="0.05" id="offUiDim" value="0.25" oninput="applyOffUI()"></div>
+                    <div class="form-group"><label>Blur Radius (1 to 100)</label><input type="number" id="offUiBlur" value="25" oninput="applyOffUI()"></div>
+                </div>
+                
+                <button class="btn btn-outline" style="margin-bottom: 15px;" onclick="showFullScreenPreview('off')"><i class="fas fa-eye"></i> 100% FULL SCREEN PREVIEW</button>
+                <button class="btn" style="margin-bottom: 15px;" onclick="showToast('Offline UI Saved!')"><i class="fas fa-save"></i> SAVE OFFLINE UI</button>
+                <button class="btn" style="background: transparent; border: 1px solid #888; color:#aaa; box-shadow:none;" onclick="applyThemePreset('off', '1')"><i class="fas fa-undo"></i> RESET TO DEFAULT</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FULL SCREEN PREVIEW MODAL -->
+    <div id="fullPreviewModal">
+        <div id="fullPreviewBox" class="preview-wrapper" style="margin: auto;"></div>
+        <button class="close-preview-btn" onclick="closeModal('fullPreviewModal')"><i class="fas fa-times"></i> CLOSE PREVIEW</button>
+    </div>
+
+    <!-- SHARED MODALS -->
+    <div class="modal" id="codeModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal('codeModal')"><i class="fas fa-times"></i></span>
+            <div class="modal-header"><h3 id="modalCodeTitle">Java Code</h3></div>
+            <pre id="modalCodeDisplay"></pre>
+            <button class="btn" onclick="copyFromModal()"><i class="fas fa-copy"></i> COPY CODE</button>
+        </div>
+    </div>
+
+    <div class="modal" id="editModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="modal-close" onclick="closeModal('editModal')"><i class="fas fa-times"></i></span>
+            <div class="modal-header"><h3>Edit Online App</h3></div>
+            <input type="hidden" id="editAppCode">
+            <div class="form-group"><label>App Name</label><input type="text" id="editAppName"></div>
+            <div class="form-group"><label>Expiry Time</label><input type="datetime-local" id="editExpiryDate"></div>
+            <button class="btn" onclick="saveAppEdits()">SAVE CHANGES</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toastBox"><i class="fas fa-check-circle" id="toastIcon"></i> <span id="toastMsg">Success</span></div>
+
+    <!-- CORE JAVASCRIPT -->
+    <script>
+        // DEFAULT PERMANENT LOGO LINK
+        var DEFAULT_LOGO_LINK = "https://i.ibb.co/fY9dxvBP/6aa2bb3e9d2d.png";
+
+        var firebaseConfig = { apiKey: "AIzaSyCphT3GQWxbyVdGeRSPWhCnn3n1QD3tJR8", authDomain: "prince-hacks-website.firebaseapp.com", databaseURL: "https://prince-hacks-website-default-rtdb.firebaseio.com", projectId: "prince-hacks-website", storageBucket: "prince-hacks-website.firebasestorage.app", messagingSenderId: "1035319104923", appId: "1:1035319104923:web:26c7c175757aebef86fd3e" };
+        firebase.initializeApp(firebaseConfig); var db = firebase.database();
+        var onlineAppsArray = []; var offlineAppsArray = []; var currentOnFilter = 'All';
+        var currentOnlineCode = ""; var currentOfflineCode = "";
+
+        // ALL FORM IDS FOR AUTO-SAVE
+        const formIds = [
+            'on-appName', 'on-expiryDate', 'on-topTag', 'on-logoUrl', 'on-popTitle', 'on-subTitle', 'on-popMsg', 'on-wn1', 'on-wn2', 'on-wn3', 'on-btnText', 'on-btnAction', 'on-actionTxt', 'on-linkUrl',
+            'off-appName', 'off-expiryDate', 'off-topTag', 'off-logoUrl', 'off-popTitle', 'off-subTitle', 'off-popMsg', 'off-wn1', 'off-wn2', 'off-wn3', 'off-btnText', 'off-btnAction', 'off-actionTxt', 'off-linkUrl',
+            'onThemeSelect', 'onUiBg', 'onUiPrimary', 'onUiText', 'onUiDanger', 'onUiBorderW', 'onUiBorderC', 'onUiRadius', 'onUiBtnRadius', 'onUiDim', 'onUiBlur',
+            'offThemeSelect', 'offUiBg', 'offUiPrimary', 'offUiText', 'offUiDanger', 'offUiBorderW', 'offUiBorderC', 'offUiRadius', 'offUiBtnRadius', 'offUiDim', 'offUiBlur'
+        ];
+
+        // 10 PREMIUM THEMES
+        const themes = {
+            '1': { bg: '#1c1c1e', pri: '#B366FF', txt: '#ffffff', dan: '#ff4c4c', rad: 60, brad: 30, dim: 0.25, blur: 25, bw: 0, bc: '#000000' },
+            '2': { bg: '#0A0A0A', pri: '#00FF41', txt: '#00FF41', dan: '#FF003C', rad: 10, brad: 5, dim: 0.5, blur: 10, bw: 2, bc: '#00FF41' },
+            '3': { bg: '#FFFFFF', pri: '#007AFF', txt: '#333333', dan: '#FF3B30', rad: 40, brad: 20, dim: 0.2, blur: 30, bw: 0, bc: '#000000' },
+            '4': { bg: '#1A0B2E', pri: '#FF007F', txt: '#FFFFFF', dan: '#FFD700', rad: 30, brad: 15, dim: 0.3, blur: 40, bw: 2, bc: '#FF007F' },
+            '5': { bg: '#2B0000', pri: '#FF3333', txt: '#FFEBEB', dan: '#FF0000', rad: 50, brad: 25, dim: 0.6, blur: 15, bw: 1, bc: '#FF3333' },
+            '6': { bg: '#001F3F', pri: '#00B4DB', txt: '#E0F7FA', dan: '#FF416C', rad: 20, brad: 10, dim: 0.4, blur: 50, bw: 0, bc: '#000000' },
+            '7': { bg: '#1C1A17', pri: '#D4AF37', txt: '#FDFBF7', dan: '#FF0000', rad: 0, brad: 0, dim: 0.7, blur: 5, bw: 2, bc: '#D4AF37' },
+            '8': { bg: '#0D1A10', pri: '#00E676', txt: '#E8F5E9', dan: '#FF5252', rad: 35, brad: 35, dim: 0.3, blur: 20, bw: 0, bc: '#000000' },
+            '9': { bg: '#000000', pri: '#FFFFFF', txt: '#FFFFFF', dan: '#FF0000', rad: 15, brad: 5, dim: 0.8, blur: 0, bw: 4, bc: '#FFFFFF' },
+            '10':{ bg: '#F4F1EA', pri: '#FFB6C1', txt: '#4A4A4A', dan: '#FF6B6B', rad: 60, brad: 30, dim: 0.1, blur: 40, bw: 0, bc: '#000000' }
+        };
+
+        // --- AUTO SAVE FUNCTIONS ---
+        function saveFormState() {
+            let state = {};
+            formIds.forEach(id => {
+                let el = document.getElementById(id);
+                if(el) { state[id] = id.includes('-actionTxt') ? el.innerText : el.value; }
+            });
+            localStorage.setItem('delogeAdminStateV20', JSON.stringify(state));
+        }
+
+        function loadFormState() {
+            let stateStr = localStorage.getItem('delogeAdminStateV20');
+            if(stateStr) {
+                let state = JSON.parse(stateStr);
+                formIds.forEach(id => {
+                    let el = document.getElementById(id);
+                    if(el && state[id] !== undefined) {
+                        if(id.includes('-actionTxt')) el.innerText = state[id];
+                        else el.value = state[id];
+                    }
+                });
+                ['on', 'off'].forEach(pre => {
+                    let action = document.getElementById(pre+'-btnAction').value;
+                    document.getElementById(pre+'-linkContainer').style.display = (action === 'link') ? 'block' : 'none';
+                });
+            }
+        }
+
+        function applyThemePreset(system, themeId) {
+            let t = themes[themeId];
+            if(t) {
+                document.getElementById(system+'UiBg').value = t.bg; document.getElementById(system+'UiPrimary').value = t.pri; document.getElementById(system+'UiText').value = t.txt; document.getElementById(system+'UiDanger').value = t.dan; document.getElementById(system+'UiRadius').value = t.rad; document.getElementById(system+'UiBtnRadius').value = t.brad; document.getElementById(system+'UiDim').value = t.dim; document.getElementById(system+'UiBlur').value = t.blur; document.getElementById(system+'UiBorderW').value = t.bw; document.getElementById(system+'UiBorderC').value = t.bc;
+                if(system === 'on') applyOnUI(); else applyOffUI();
+                saveFormState();
+                showToast("Theme Applied!");
+            }
+        }
+
+        function showFullScreenPreview(type) {
+            let clone = document.getElementById('pv-' + type + '-wrapper').innerHTML;
+            document.getElementById('fullPreviewBox').innerHTML = clone;
+            
+            let bg = document.getElementById(type + 'UiBg').value; let rad = document.getElementById(type + 'UiRadius').value; let bw = document.getElementById(type + 'UiBorderW').value; let bc = document.getElementById(type + 'UiBorderC').value; let dim = document.getElementById(type + 'UiDim').value; let blur = document.getElementById(type + 'UiBlur').value;
+
+            let box = document.getElementById('fullPreviewBox');
+            box.style.background = bg; box.style.borderRadius = (rad * 0.4) + 'px'; box.style.border = bw > 0 ? (bw + 'px solid ' + bc) : 'none';
+
+            let modal = document.getElementById('fullPreviewModal');
+            modal.style.background = `rgba(0,0,0,${dim})`; modal.style.backdropFilter = `blur(${blur}px)`; modal.classList.add('show');
+        }
+
+        function toggleMenu() { document.getElementById('sidebar').classList.toggle('active'); document.getElementById('overlay').classList.toggle('active'); }
+        function switchPage(pageId) { 
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active')); document.getElementById('page-' + pageId).classList.add('active'); event.currentTarget.classList.add('active'); 
+            let tMap = {'dashboard':'Dashboard', 'gen-on':'Generate Online', 'man-on':'Manage Online', 'ui-on':'Online UI', 'gen-off':'Generate Offline', 'man-off':'Offline History', 'ui-off':'Offline UI', 'settings':'Settings'};
+            document.getElementById('pageTitle').innerText = tMap[pageId].toUpperCase(); 
+            if(window.innerWidth <= 768) toggleMenu(); 
+        }
+        function toggleDropdown(id) { var el = document.getElementById(id).parentElement; document.querySelectorAll('.custom-select').forEach(sel => { if(sel !== el) sel.classList.remove('active'); }); el.classList.toggle('active'); }
+        document.addEventListener('click', function(e) { if(!e.target.closest('.custom-select')) { document.querySelectorAll('.custom-select').forEach(el => el.classList.remove('active')); }});
+        
+        function selectAction(val, text, pre) { 
+            document.getElementById(pre+'-actionTxt').innerText = text; document.getElementById(pre+'-btnAction').value = val; document.getElementById(pre+'-actionDropdown').parentElement.classList.remove('active'); document.getElementById(pre+'-linkContainer').style.display = val === 'link' ? 'block' : 'none'; 
+            saveFormState();
+        }
+        
+        function showToast(msg, isError = false) { var box = document.getElementById('toastBox'); document.getElementById('toastMsg').innerText = msg; box.style.background = isError ? 'var(--danger)' : 'var(--success)'; box.style.color = isError ? 'white' : 'black'; box.classList.add('show'); setTimeout(() => box.classList.remove('show'), 3000); }
+        function copyTextToClipboard(text) { if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).then(() => showToast("Copied!")); } else { var ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast("Copied!"); } }
+        
+        function copyInlineCode(pre) { if(pre === 'on') { copyTextToClipboard(currentOnlineCode); } else { copyTextToClipboard(currentOfflineCode); } }
+        function copyFromModal() { copyTextToClipboard(document.getElementById('modalCodeDisplay').textContent); }
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+        
+        function escapeJava(str) { return str ? str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, '" + "\\n" + "') : ""; }
+        function adjustColor(color, amount) { return '#' + color.replace(/^#/, '').replace(/../g, color => ('0'+Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2)); }
+
+        function applyOnUI() {
+            let bg = document.getElementById('onUiBg').value; let primary = document.getElementById('onUiPrimary').value; let text = document.getElementById('onUiText').value; let danger = document.getElementById('onUiDanger').value;
+            let bw = document.getElementById('onUiBorderW').value; let bc = document.getElementById('onUiBorderC').value; let rad = document.getElementById('onUiRadius').value; let btnRad = document.getElementById('onUiBtnRadius').value;
+            let wrap = document.getElementById('pv-on-wrapper');
+            wrap.style.background = bg; wrap.style.borderRadius = (rad * 0.4) + 'px'; wrap.style.border = bw > 0 ? (bw + 'px solid ' + bc) : 'none';
+            document.getElementById('pv-on-title').style.color = text; document.getElementById('pv-on-subtitle').style.color = primary; document.getElementById('pv-on-wntitle').style.color = primary; 
+            let btn = document.getElementById('pv-on-btn'); btn.style.background = primary; btn.style.color = (bg==='#FFFFFF'||bg==='#F4F1EA') ? '#FFFFFF' : text; btn.style.borderRadius = (btnRad * 0.4) + 'px';
+            document.getElementById('pv-on-tag').style.color = danger; document.getElementById('pv-on-tag').style.borderColor = danger; 
+            document.getElementById('pv-on-box').style.background = adjustColor(bg, (bg==='#FFFFFF'||bg==='#F4F1EA')?-10:10); document.getElementById('pv-on-box').style.borderColor = adjustColor(bg, 20);
+            updateOnPreview();
+        }
+
+        function applyOffUI() {
+            let bg = document.getElementById('offUiBg').value; let primary = document.getElementById('offUiPrimary').value; let text = document.getElementById('offUiText').value; let danger = document.getElementById('offUiDanger').value;
+            let bw = document.getElementById('offUiBorderW').value; let bc = document.getElementById('offUiBorderC').value; let rad = document.getElementById('offUiRadius').value; let btnRad = document.getElementById('offUiBtnRadius').value;
+            let wrap = document.getElementById('pv-off-wrapper');
+            wrap.style.background = bg; wrap.style.borderRadius = (rad * 0.4) + 'px'; wrap.style.border = bw > 0 ? (bw + 'px solid ' + bc) : 'none';
+            document.getElementById('pv-off-title').style.color = text; document.getElementById('pv-off-subtitle').style.color = primary; document.getElementById('pv-off-wntitle').style.color = primary; 
+            let btn = document.getElementById('pv-off-btn'); btn.style.background = primary; btn.style.color = (bg==='#FFFFFF'||bg==='#F4F1EA') ? '#FFFFFF' : text; btn.style.borderRadius = (btnRad * 0.4) + 'px';
+            document.getElementById('pv-off-tag').style.color = danger; document.getElementById('pv-off-tag').style.borderColor = danger; 
+            document.getElementById('pv-off-box').style.background = adjustColor(bg, (bg==='#FFFFFF'||bg==='#F4F1EA')?-10:10);
+            updateOffPreview();
+        }
+
+        function updateOnPreview() {
+            document.getElementById('pv-on-tag').innerText = document.getElementById('on-topTag').value || " "; 
+            document.getElementById('pv-on-logo').src = document.getElementById('on-logoUrl').value || DEFAULT_LOGO_LINK; 
+            document.getElementById('pv-on-title').innerText = document.getElementById('on-popTitle').value || " "; document.getElementById('pv-on-subtitle').innerText = document.getElementById('on-subTitle').value || " "; document.getElementById('pv-on-body').innerText = document.getElementById('on-popMsg').value || " ";
+            ['1','2','3'].forEach(i => { let val = document.getElementById('on-wn'+i).value.trim(); document.getElementById('pv-on-wn'+i).style.display = val ? "flex" : "none"; document.getElementById('pv-on-wn'+i).innerText = val; document.getElementById('pv-on-wn'+i).style.color = document.getElementById('onUiText').value;});
+            document.getElementById('pv-on-btn').innerText = document.getElementById('on-btnText').value || " "; document.getElementById('pv-on-body').style.color = document.getElementById('onUiText').value;
+        }
+
+        function updateOffPreview() {
+            document.getElementById('pv-off-tag').innerText = document.getElementById('off-topTag').value || " "; 
+            document.getElementById('pv-off-logo').src = document.getElementById('off-logoUrl').value || DEFAULT_LOGO_LINK;
+            document.getElementById('pv-off-title').innerText = document.getElementById('off-popTitle').value || " "; document.getElementById('pv-off-subtitle').innerText = document.getElementById('off-subTitle').value || " "; document.getElementById('pv-off-body').innerText = document.getElementById('off-popMsg').value || " ";
+            ['1','2','3'].forEach(i => { let val = document.getElementById('off-wn'+i).value.trim(); document.getElementById('pv-off-wn'+i).style.display = val ? "flex" : "none"; document.getElementById('pv-off-wn'+i).innerText = val; document.getElementById('pv-off-wn'+i).style.color = document.getElementById('offUiText').value; });
+            document.getElementById('pv-off-btn').innerText = document.getElementById('off-btnText').value || " "; document.getElementById('pv-off-body').style.color = document.getElementById('offUiText').value;
+        }
+
+        // --- JAVA CODE TEMPLATE ENGINE (EXACT MATCH WITH SNIPPET 2) ---
+        function getJavaString(isOnline, appName, newCode, expTimeMillis, uBg, uPri, uTxt, uDan, uRad, uBtnRad, uDim, uBlur, uBw, uBc, tag, logo, title, sub, msg, w1, w2, w3, btnTxt, clickAction) {
+            var strokeCode = uBw > 0 ? `bgShape.setStroke(${uBw}, android.graphics.Color.parseColor("${uBc}"));` : ``;
+            var finalLogoUrl = logo ? logo : DEFAULT_LOGO_LINK;
+
+            var coreCode = `    final android.app.Dialog dialog = new android.app.Dialog(MainActivity.this);
+    dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+    dialog.setCancelable(false);
+    dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+    dialog.getWindow().getAttributes().windowAnimations = android.R.style.Animation_Dialog;
+    android.widget.LinearLayout mainLayout = new android.widget.LinearLayout(MainActivity.this);
+    mainLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+    android.graphics.drawable.GradientDrawable bgShape = new android.graphics.drawable.GradientDrawable();
+    bgShape.setColor(android.graphics.Color.parseColor("${uBg}"));
+    bgShape.setCornerRadius(${uRad}f);
+    ${strokeCode}
+    mainLayout.setBackground(bgShape);
+    mainLayout.setPadding(60, 60, 60, 60);
+    mainLayout.setClipChildren(false);
+    mainLayout.setClipToPadding(false);
+    android.widget.TextView topTag = new android.widget.TextView(MainActivity.this);
+    topTag.setText("${tag}");
+    topTag.setTextColor(android.graphics.Color.parseColor("${uDan}"));
+    topTag.setTextSize(12);
+    topTag.setPadding(35, 12, 35, 12);
+    android.graphics.drawable.GradientDrawable tagShape = new android.graphics.drawable.GradientDrawable();
+    tagShape.setStroke(2, android.graphics.Color.parseColor("${uDan}"));
+    tagShape.setColor(android.graphics.Color.parseColor("#1A" + "${uDan}".replace("#","")));
+    tagShape.setCornerRadius(40f);
+    topTag.setBackground(tagShape);
+    android.widget.LinearLayout.LayoutParams tagParams = new android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+    tagParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+    tagParams.topMargin = 15;
+    tagParams.bottomMargin = 35;
+    mainLayout.addView(topTag, tagParams);
+    android.widget.LinearLayout headerLayout = new android.widget.LinearLayout(MainActivity.this);
+    headerLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    headerLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    final android.widget.ImageView logoImg = new android.widget.ImageView(MainActivity.this);
+    android.widget.LinearLayout.LayoutParams imgParams = new android.widget.LinearLayout.LayoutParams(130, 130);
+    imgParams.rightMargin = 30;
+    logoImg.setLayoutParams(imgParams);
+    headerLayout.addView(logoImg);
+    new Thread(new Runnable() { public void run() { try { java.net.URL imgUrl = new java.net.URL("${finalLogoUrl}"); final android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(imgUrl.openConnection().getInputStream()); runOnUiThread(new Runnable() { public void run() { logoImg.setImageBitmap(bmp); } }); } catch (Exception e) {} } }).start();
+    android.widget.LinearLayout titleLayout = new android.widget.LinearLayout(MainActivity.this);
+    titleLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
+    android.widget.TextView mainTitle = new android.widget.TextView(MainActivity.this);
+    mainTitle.setText("${title}");
+    mainTitle.setTextColor(android.graphics.Color.parseColor("${uTxt}"));
+    mainTitle.setTextSize(17);
+    mainTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+    android.widget.TextView subTitle = new android.widget.TextView(MainActivity.this);
+    subTitle.setText("${sub}");
+    subTitle.setTextColor(android.graphics.Color.parseColor("${uPri}"));
+    subTitle.setTextSize(13);
+    subTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+    titleLayout.addView(mainTitle);
+    titleLayout.addView(subTitle);
+    headerLayout.addView(titleLayout);
+    mainLayout.addView(headerLayout);
+    android.widget.Space sp1 = new android.widget.Space(MainActivity.this);
+    sp1.setLayoutParams(new android.widget.LinearLayout.LayoutParams(1, 40));
+    mainLayout.addView(sp1);
+    android.widget.TextView bodyText = new android.widget.TextView(MainActivity.this);
+    bodyText.setText("${msg}");
+    bodyText.setTextColor(android.graphics.Color.parseColor("${uTxt}"));
+    bodyText.setTextSize(14);
+    mainLayout.addView(bodyText);
+    android.widget.Space sp2 = new android.widget.Space(MainActivity.this);
+    sp2.setLayoutParams(new android.widget.LinearLayout.LayoutParams(1, 40));
+    mainLayout.addView(sp2);
+    android.widget.LinearLayout whatsNewBox = new android.widget.LinearLayout(MainActivity.this);
+    whatsNewBox.setOrientation(android.widget.LinearLayout.VERTICAL);
+    android.graphics.drawable.GradientDrawable wnShape = new android.graphics.drawable.GradientDrawable();
+    wnShape.setColor(android.graphics.Color.parseColor("#15FFFFFF"));
+    wnShape.setCornerRadius(30f);
+    whatsNewBox.setBackground(wnShape);
+    whatsNewBox.setPadding(40, 40, 40, 40);
+    android.widget.TextView wnTitle = new android.widget.TextView(MainActivity.this);
+    wnTitle.setText("What\\'s New");
+    wnTitle.setTextColor(android.graphics.Color.parseColor("${uPri}"));
+    wnTitle.setTextSize(13);
+    wnTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+    whatsNewBox.addView(wnTitle);
+    String[] bullets = {"${w1}", "${w2}", "${w3}"};
+    for(String b : bullets) {
+        if(b.trim().length() > 0) {
+            android.widget.TextView bullet = new android.widget.TextView(MainActivity.this);
+            bullet.setText(b);
+            bullet.setTextColor(android.graphics.Color.parseColor("${uTxt}"));
+            bullet.setTextSize(14);
+            bullet.setPadding(0, 15, 0, 0);
+            whatsNewBox.addView(bullet);
+        }
+    }
+    mainLayout.addView(whatsNewBox);
+    android.widget.Space sp3 = new android.widget.Space(MainActivity.this);
+    sp3.setLayoutParams(new android.widget.LinearLayout.LayoutParams(1, 40));
+    mainLayout.addView(sp3);
+    android.widget.Button actionBtn = new android.widget.Button(MainActivity.this);
+    actionBtn.setText("${btnTxt}");
+    actionBtn.setTextColor(android.graphics.Color.parseColor("${(uBg==='#FFFFFF'||uBg==='#F4F1EA') ? '#FFFFFF' : uTxt}"));
+    actionBtn.setTextSize(15);
+    actionBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+    android.graphics.drawable.GradientDrawable btnShape = new android.graphics.drawable.GradientDrawable();
+    btnShape.setColor(android.graphics.Color.parseColor("${uPri}"));
+    btnShape.setCornerRadius(${uBtnRad}f);
+    actionBtn.setBackground(btnShape);
+    actionBtn.setOnClickListener(new android.view.View.OnClickListener() { @Override public void onClick(android.view.View v) { ${clickAction} } });
+    mainLayout.addView(actionBtn);
+    dialog.setContentView(mainLayout);
+    android.view.Window window = dialog.getWindow();
+    if (window != null) {
+        window.setLayout((int)(getResources().getDisplayMetrics().widthPixels * 0.90), android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        window.setDimAmount(${uDim}f);
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+            window.getAttributes().setBlurBehindRadius(${uBlur});
+        }
+    }
+    dialog.show();
+    android.animation.ObjectAnimator animX = android.animation.ObjectAnimator.ofFloat(topTag, "scaleX", 1.0f, 1.08f);
+    android.animation.ObjectAnimator animY = android.animation.ObjectAnimator.ofFloat(topTag, "scaleY", 1.0f, 1.08f);
+    animX.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+    animX.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+    animX.setDuration(600);
+    animY.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+    animY.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+    animY.setDuration(600);
+    android.animation.AnimatorSet animSet = new android.animation.AnimatorSet();
+    animSet.playTogether(animX, animY);
+    animSet.start();`;
+
+            if(isOnline) {
+                // Exact Match with User Snippet 2
+                return `// ONLINE APP: ${appName} | CODE: ${newCode}\nfinal String appCode = "${newCode}";\nfinal String dbUrl = "https://prince-hacks-website-default-rtdb.firebaseio.com/app_control/apps/" + appCode + ".json";\nnew Thread(new Runnable() { @Override public void run() { while(!isFinishing()) { try { java.net.URL url = new java.net.URL(dbUrl); java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection(); conn.setRequestMethod("GET"); conn.setConnectTimeout(5000); java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream())); String inputLine; StringBuilder response = new StringBuilder(); while ((inputLine = in.readLine()) != null) { response.append(inputLine); } in.close(); org.json.JSONObject json = new org.json.JSONObject(response.toString()); String status = json.optString("status", "Active"); long expTime = json.optLong("expiryTime", 0); boolean isExpired = "Expired".equals(status); if (!isExpired && expTime > 0 && System.currentTimeMillis() > expTime) { isExpired = true; } if (isExpired) { runOnUiThread(new Runnable() { @Override public void run() { if (!isFinishing()) {\n${coreCode}\n} } }); break; } Thread.sleep(3000); } catch (Exception e) { try { Thread.sleep(3000); } catch (Exception ex) {} } } } }).start();`;
+            } else {
+                return `// OFFLINE AUTO-EXPIRE CODE: ${appName}\nlong expiryTime = ${expTimeMillis}L;\nif (System.currentTimeMillis() >= expiryTime) {\n${coreCode}\n}`;
+            }
+        }
+
+        // --- ONLINE GENERATOR ---
+        function generateOnlineCode() {
+            var appName = document.getElementById('on-appName').value.trim(); if(!appName) return showToast("Enter App Name!", true);
+            var expTimeMillis = document.getElementById('on-expiryDate').value ? new Date(document.getElementById('on-expiryDate').value).getTime() : 0;
+            var newCode = "PRINCE-" + Math.floor(100000 + Math.random() * 900000);
+            
+            var uBg = document.getElementById('onUiBg').value; var uPri = document.getElementById('onUiPrimary').value; var uTxt = document.getElementById('onUiText').value; var uDan = document.getElementById('onUiDanger').value; var uRad = document.getElementById('onUiRadius').value || "60"; var uBtnRad = document.getElementById('onUiBtnRadius').value || "30"; var uDim = document.getElementById('onUiDim').value || "0.25"; var uBlur = document.getElementById('onUiBlur').value || "25"; var uBw = document.getElementById('onUiBorderW').value || "0"; var uBc = document.getElementById('onUiBorderC').value || "#000000";
+            var tag = escapeJava(document.getElementById("on-topTag").value); var logo = document.getElementById("on-logoUrl").value; var title = escapeJava(document.getElementById("on-popTitle").value); var sub = escapeJava(document.getElementById("on-subTitle").value); var msg = escapeJava(document.getElementById("on-popMsg").value); var w1 = escapeJava(document.getElementById("on-wn1").value); var w2 = escapeJava(document.getElementById("on-wn2").value); var w3 = escapeJava(document.getElementById("on-wn3").value); var btnTxt = escapeJava(document.getElementById("on-btnText").value);
+            var action = document.getElementById("on-btnAction").value; var url = document.getElementById("on-linkUrl").value;
+            var javaActionCode = action === "link" ? `android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("${url}")); startActivity(intent); finishAffinity();` : `finishAffinity();`;
+
+            var javaCode = getJavaString(true, appName, newCode, expTimeMillis, uBg, uPri, uTxt, uDan, uRad, uBtnRad, uDim, uBlur, uBw, uBc, tag, logo, title, sub, msg, w1, w2, w3, btnTxt, javaActionCode);
+
+            currentOnlineCode = javaCode;
+
+            db.ref('app_control/apps/' + newCode).set({ name: appName, status: "Active", date: new Date().toLocaleDateString("en-GB"), timestamp: Date.now(), expiryTime: expTimeMillis, javacode: javaCode }).then(() => {
+                document.getElementById('on-outputBox').style.display = "block"; document.getElementById('on-appName').value = ""; showToast("Online Code Ready!");
+            });
+        }
+
+        // --- FETCH AND CHECK ONLINE EXPIRY LIVE ---
+        db.ref('app_control/apps').on('value', (snapshot) => {
+            onlineAppsArray = []; var total = 0, active = 0, expired = 0; let now = Date.now();
+            snapshot.forEach((child) => { 
+                var data = child.val(); data.code = child.key; onlineAppsArray.push(data); total++; 
+                let isTimeExpired = (data.expiryTime > 0 && now > data.expiryTime);
+                if(data.status === "Expired" || isTimeExpired) { expired++; } else { active++; }
+            });
+            document.getElementById('stat-on-total').innerText = total; document.getElementById('stat-on-active').innerText = active; document.getElementById('stat-on-expired').innerText = expired;
+            onlineAppsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); renderOnList();
+        });
+
+        function setOnFilter(status, btnElement) { currentOnFilter = status; document.querySelectorAll('#page-man-on .filter-btn').forEach(btn => btn.classList.remove('active')); btnElement.classList.add('active'); renderOnList(); }
+        
+        function renderOnList() {
+            var listContainer = document.getElementById('on-appListContainer'); var searchQuery = document.getElementById('on-searchInput').value.toLowerCase(); listContainer.innerHTML = '';
+            let now = Date.now();
+            var filteredData = onlineAppsArray.filter(app => { 
+                let isTimeExpired = (app.expiryTime > 0 && now > app.expiryTime);
+                let displayStatus = (app.status === "Expired" || isTimeExpired) ? "Expired" : "Active";
+                let matchesSearch = ((app.name && app.name.toLowerCase().includes(searchQuery)) || app.code.toLowerCase().includes(searchQuery));
+                let matchesFilter = (currentOnFilter === 'All') || (displayStatus === currentOnFilter);
+                return matchesSearch && matchesFilter; 
+            });
+            
+            if(filteredData.length === 0) return listContainer.innerHTML = '<li style="text-align: center; color: #555; padding: 20px;">No apps found.</li>';
+            filteredData.forEach(app => {
+                let isTimeExpired = (app.expiryTime > 0 && now > app.expiryTime);
+                let displayStatus = (app.status === "Expired" || isTimeExpired) ? "Expired" : "Active";
+                var badgeClass = displayStatus === "Active" ? "b-active" : "b-expired"; 
+                var dropDownId = 'on-man-sel-' + app.code; var expText = app.expiryTime && app.expiryTime > 0 ? new Date(app.expiryTime).toLocaleString('en-IN') : "No Limit";
+                var li = document.createElement('li'); li.className = "app-item";
+                li.innerHTML = `
+                    <div class="app-info"><h4>${app.name} <span class="badge ${badgeClass}">${displayStatus}</span></h4><p>${app.code} &nbsp;|&nbsp; ⏱️ Expiry: ${expText}</p></div>
+                    <div class="app-controls">
+                        <div class="custom-select" id="${dropDownId}" onclick="toggleDropdown('${dropDownId}Dropdown')" style="width: 110px; padding:0;">
+                            <div class="select-btn" style="padding: 10px;"><span id="on-sel-txt-${app.code}">${displayStatus}</span> <i class="fas fa-chevron-down" style="font-size:12px;"></i></div>
+                            <div class="select-dropdown" id="${dropDownId}Dropdown">
+                                <div class="select-option" onclick="setOnStatus('${app.code}', 'Active')">Active</div>
+                                <div class="select-option" onclick="setOnStatus('${app.code}', 'Expired')">Expired</div>
+                            </div>
+                        </div>
+                        <button class="btn-small btn-edit" onclick="openOnEditModal('${app.code}')"><i class="fas fa-pen"></i></button>
+                        <button class="btn-small btn-view" onclick="openCodeModal('${app.code}', 'on')"><i class="fas fa-code"></i></button>
+                        <button class="btn-small btn-delete" onclick="deleteOnApp('${app.code}')"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                listContainer.appendChild(li);
+            });
+        }
+
+        function setOnStatus(code, status) { document.getElementById('on-sel-txt-' + code).innerText = status; document.getElementById('on-man-sel-' + code).classList.remove('active'); db.ref('app_control/apps/' + code).update({ status: status }).then(() => showToast("Status updated")); }
+        function deleteOnApp(code) { if(confirm("Delete app?")) { db.ref('app_control/apps/' + code).remove().then(() => showToast("Deleted successfully!")); } }
+        function openCodeModal(code, type) { 
+            var app = (type==='on') ? onlineAppsArray.find(a => a.code === code) : offlineAppsArray.find(a => a.id === code);
+            if(app && (app.javacode || app.code)) { 
+                document.getElementById('modalCodeTitle').innerText = type==='on' ? "Online Java Code" : "Offline Java Code";
+                document.getElementById('modalCodeDisplay').textContent = app.javacode || app.code; 
+                document.getElementById('codeModal').classList.add('show'); 
+            } else { showToast("Code not found!", true); }
+        }
+        function openOnEditModal(code) { var app = onlineAppsArray.find(a => a.code === code); if(app) { document.getElementById('editAppCode').value = code; document.getElementById('editAppName').value = app.name; if (app.expiryTime && app.expiryTime > 0) { var tzoffset = (new Date()).getTimezoneOffset() * 60000; document.getElementById('editExpiryDate').value = (new Date(app.expiryTime - tzoffset)).toISOString().slice(0, 16); } else { document.getElementById('editExpiryDate').value = ""; } document.getElementById('editModal').classList.add('show'); } }
+        function saveAppEdits() { var code = document.getElementById('editAppCode').value; var newName = document.getElementById('editAppName').value; var newExpRaw = document.getElementById('editExpiryDate').value; var newExpMillis = newExpRaw ? new Date(newExpRaw).getTime() : 0; if(!newName) return showToast("App Name required!", true); db.ref('app_control/apps/' + code).update({ name: newName, expiryTime: newExpMillis }).then(() => { closeModal('editModal'); showToast("App updated!"); }); }
+
+        // --- OFFLINE GENERATOR ---
+        function generateOfflineCode() {
+            var appName = document.getElementById('off-appName').value.trim(); if(!appName) return showToast("Enter App Name!", true);
+            var expDateRaw = document.getElementById('off-expiryDate').value; if(!expDateRaw) return showToast("Expiry Date Required!", true);
+            var expTimeMillis = new Date(expDateRaw).getTime();
+            
+            var uBg = document.getElementById('offUiBg').value; var uPri = document.getElementById('offUiPrimary').value; var uTxt = document.getElementById('offUiText').value; var uDan = document.getElementById('offUiDanger').value; var uRad = document.getElementById('offUiRadius').value || "60"; var uBtnRad = document.getElementById('offUiBtnRadius').value || "30"; var uDim = document.getElementById('offUiDim').value || "0.25"; var uBlur = document.getElementById('offUiBlur').value || "25"; var uBw = document.getElementById('offUiBorderW').value || "0"; var uBc = document.getElementById('offUiBorderC').value || "#000000";
+            var tag = escapeJava(document.getElementById("off-topTag").value); var logo = document.getElementById("off-logoUrl").value; var title = escapeJava(document.getElementById("off-popTitle").value); var sub = escapeJava(document.getElementById("off-subTitle").value); var msg = escapeJava(document.getElementById("off-popMsg").value); var w1 = escapeJava(document.getElementById("off-wn1").value); var w2 = escapeJava(document.getElementById("off-wn2").value); var w3 = escapeJava(document.getElementById("off-wn3").value); var btnTxt = escapeJava(document.getElementById("off-btnText").value);
+            var action = document.getElementById("off-btnAction").value; var url = document.getElementById("off-linkUrl").value;
+            var clickAction = action === "link" ? `android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("${url}")); startActivity(intent); finishAffinity();` : `finishAffinity();`;
+
+            var javaCode = getJavaString(false, appName, "", expTimeMillis, uBg, uPri, uTxt, uDan, uRad, uBtnRad, uDim, uBlur, uBw, uBc, tag, logo, title, sub, msg, w1, w2, w3, btnTxt, clickAction);
+
+            currentOfflineCode = javaCode;
+
+            var record = { id: Date.now(), name: appName, expTime: expTimeMillis, code: javaCode };
+            offlineAppsArray.unshift(record); localStorage.setItem('offlineAppsHistory', JSON.stringify(offlineAppsArray));
+            document.getElementById('off-outputBox').style.display = "block"; document.getElementById('off-appName').value = ""; renderOffList(); showToast("Offline Code Ready!");
+        }
+
+        function loadOfflineData() { offlineAppsArray = JSON.parse(localStorage.getItem('offlineAppsHistory') || '[]'); renderOffList(); }
+        
+        function renderOffList() {
+            var listContainer = document.getElementById('off-appListContainer'); var searchQuery = document.getElementById('off-searchInput').value.toLowerCase(); listContainer.innerHTML = '';
+            let active = 0, expired = 0, now = Date.now();
+            if(offlineAppsArray.length === 0) { listContainer.innerHTML = '<li style="text-align: center; color: #555; padding: 20px;">No offline codes generated yet.</li>'; document.getElementById('stat-off-total').innerText = 0; document.getElementById('stat-off-active').innerText = 0; document.getElementById('stat-off-expired').innerText = 0; return; }
+            var filteredData = offlineAppsArray.filter(app => { return (app.name && app.name.toLowerCase().includes(searchQuery)); });
+            filteredData.forEach(app => {
+                let isExpired = now >= app.expTime; if(isExpired) expired++; else active++;
+                let badgeClass = isExpired ? "b-expired" : "b-active"; let statusTxt = isExpired ? "EXPIRED" : "ACTIVE"; let expTxt = new Date(app.expTime).toLocaleString('en-IN');
+                var li = document.createElement('li'); li.className = "app-item";
+                li.innerHTML = `
+                    <div class="app-info"><h4>${app.name} <span class="badge ${badgeClass}">${statusTxt}</span></h4><p>⏱️ Lock Timer: ${expTxt}</p></div>
+                    <div class="app-controls">
+                        <button class="btn-small btn-view" onclick="openCodeModal(${app.id}, 'off')"><i class="fas fa-code"></i></button>
+                        <button class="btn-small btn-delete" onclick="deleteOffApp(${app.id})"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                listContainer.appendChild(li);
+            });
+            document.getElementById('stat-off-total').innerText = offlineAppsArray.length; document.getElementById('stat-off-active').innerText = active; document.getElementById('stat-off-expired').innerText = expired;
+        }
+
+        function deleteOffApp(id) { if(confirm("Delete this offline record?")) { offlineAppsArray = offlineAppsArray.filter(a => a.id !== id); localStorage.setItem('offlineAppsHistory', JSON.stringify(offlineAppsArray)); renderOffList(); showToast("Record Deleted"); } }
+
+        // --- USER AUTHENTICATION ---
+        var DEFAULT_USER = 'user';
+        var DEFAULT_PASS = 'user123';
+        var fbUsers = [];
+        var fbUsersLoaded = false;
+
+        function loadFBUsers(callback) {
+            if (fbUsersLoaded) { if (callback) callback(); return; }
+            db.ref('admin_control/users').once('value', function(snapshot) {
+                fbUsers = [];
+                snapshot.forEach(function(child) {
+                    var user = child.val();
+                    user._key = child.key;
+                    fbUsers.push(user);
+                });
+                fbUsersLoaded = true;
+                if (callback) callback();
+            }, function(err) {
+                if (callback) callback(err);
+            });
+        }
+
+        function getUserCreds(username, password, callback) {
+            loadFBUsers(function(err) {
+                if (err) { callback(null); return; }
+                if (fbUsers.length === 0) {
+                    if ((!username && !password) || (username === DEFAULT_USER && password === DEFAULT_PASS)) {
+                        callback({ username: DEFAULT_USER, password: DEFAULT_PASS, fromDefault: true });
+                        return;
+                    }
+                    callback(null); return;
+                }
+                for (var i = 0; i < fbUsers.length; i++) {
+                    if (fbUsers[i].username === username && fbUsers[i].password === password) {
+                        callback({ _key: fbUsers[i]._key, username: fbUsers[i].username, password: fbUsers[i].password, deviceLimit: fbUsers[i].deviceLimit || 0, lockedDevices: fbUsers[i].lockedDevices || [], index: i });
+                        return;
+                    }
+                }
+                callback(null);
+            });
+        }
+
+        function saveUserRemember() {
+            if (document.getElementById('savePass').checked) {
+                localStorage.setItem('userSavedLogin', JSON.stringify({
+                    user: document.getElementById('loginUser').value.trim(),
+                    pass: document.getElementById('loginPass').value
+                }));
+            } else {
+                localStorage.removeItem('userSavedLogin');
+            }
+        }
+
+        function loadUserRemember() {
+            var saved = localStorage.getItem('userSavedLogin');
+            if (saved) {
+                try {
+                    var d = JSON.parse(saved);
+                    document.getElementById('loginUser').value = d.user || '';
+                    document.getElementById('loginPass').value = d.pass || '';
+                    document.getElementById('savePass').checked = true;
+                } catch(e) {}
+            }
+        }
+
+        function getDeviceId() {
+            var d = localStorage.getItem('_deviceId');
+            if (!d) {
+                d = Math.random().toString(16).substr(2, 16);
+                localStorage.setItem('_deviceId', d);
+            }
+            return d;
+        }
+
+        function userLogin() {
+            var u = document.getElementById('loginUser').value.trim();
+            var p = document.getElementById('loginPass').value;
+            var e = document.getElementById('loginError');
+            if(!u || !p) { e.textContent='Enter username and password!'; e.style.display='block'; return; }
+            loadFBUsers(function() {
+                if (fbUsers.length === 0) {
+                    if (u === DEFAULT_USER && p === DEFAULT_PASS) {
+                        finishLogin(u);
+                    } else {
+                        e.textContent='Invalid credentials! Contact admin.'; e.style.display='block';
+                    }
+                    return;
+                }
+                var userData = null;
+                for (var i = 0; i < fbUsers.length; i++) {
+                    if (fbUsers[i].username === u && fbUsers[i].password === p) { userData = fbUsers[i]; break; }
+                }
+                if (!userData) { e.textContent='Invalid credentials! Contact admin.'; e.style.display='block'; return; }
+                var limit = userData.deviceLimit || 0;
+                var lockedDevices = userData.lockedDevices || [];
+                if (limit > 0) {
+                    var currentDevice = getDeviceId();
+                    if (lockedDevices.indexOf(currentDevice) === -1) {
+                        if (lockedDevices.length >= limit) {
+                            e.textContent='Device limit (' + limit + ') reached! Contact admin to reset.'; e.style.display='block'; return;
+                        }
+                        lockedDevices.push(currentDevice);
+                        db.ref('admin_control/users/' + userData._key + '/lockedDevices').set(lockedDevices);
+                    }
+                }
+                finishLogin(u);
+            });
+        }
+
+        function finishLogin(u) {
+            saveUserRemember();
+            document.getElementById('loginUser').value=''; document.getElementById('loginPass').value='';
+            document.getElementById('loginOverlay').classList.add('hidden');
+            sessionStorage.setItem('panelLoggedIn','true');
+            sessionStorage.setItem('panelLoggedUser', u);
+            document.getElementById('settingsCurUser').value = u;
+            showToast('Welcome!');
+        }
+
+        function userLogout() {
+            sessionStorage.removeItem('panelLoggedIn');
+            sessionStorage.removeItem('panelLoggedUser');
+            document.getElementById('loginOverlay').classList.remove('hidden');
+            document.getElementById('loginError').style.display='none';
+            loadUserRemember();
+        }
+
+        function changeUserCredentials() {
+            var oldPass = document.getElementById('settingsOldPass').value;
+            var newUser = document.getElementById('settingsNewUser').value.trim();
+            var newPass = document.getElementById('settingsNewPass').value;
+            var loggedUser = sessionStorage.getItem('panelLoggedUser');
+            var msg = document.getElementById('settingsMsg');
+            msg.style.display='none';
+            if(!oldPass || !newUser || !newPass) { msg.textContent='All fields required!'; msg.style.color='#FF4C4C'; msg.style.display='block'; return; }
+            if(newPass.length<4) { msg.textContent='Password min 4 chars!'; msg.style.color='#FF4C4C'; msg.style.display='block'; return; }
+            loadFBUsers(function() {
+                var found = false;
+                for (var i = 0; i < fbUsers.length; i++) {
+                    if (fbUsers[i].username === loggedUser) {
+                        if (fbUsers[i].password !== oldPass) { msg.textContent='Wrong current password!'; msg.style.color='#FF4C4C'; msg.style.display='block'; return; }
+                        var updates = { username: newUser, password: newPass };
+                        db.ref('admin_control/users/' + fbUsers[i]._key).update(updates);
+                        // Move device lock if username changed
+                        if (loggedUser !== newUser) {
+                            var locked = fbUsers[i].lockedDevices || [];
+                            db.ref('admin_control/users/' + fbUsers[i]._key + '/lockedDevices').set(locked);
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found && loggedUser === DEFAULT_USER) {
+                    if (oldPass !== DEFAULT_PASS) { msg.textContent='Wrong current password!'; msg.style.color='#FF4C4C'; msg.style.display='block'; return; }
+                    db.ref('admin_control/users').push({
+                        username: newUser, password: newPass, device: 'Default',
+                        deviceLimit: 1, lockedDevices: [], created: Date.now()
+                    });
+                    found = true;
+                }
+                if (!found) { msg.textContent='User not found!'; msg.style.color='#FF4C4C'; msg.style.display='block'; return; }
+                sessionStorage.setItem('panelLoggedUser', newUser);
+                document.getElementById('settingsCurUser').value = newUser;
+                document.getElementById('settingsOldPass').value=''; document.getElementById('settingsNewUser').value=''; document.getElementById('settingsNewPass').value='';
+                msg.textContent='Credentials updated!'; msg.style.color='#00E676'; msg.style.display='block';
+                showToast('Credentials updated!');
+            });
+        }
+
+        function checkUserAuth() {
+            var loggedIn = sessionStorage.getItem('panelLoggedIn');
+            if (loggedIn === 'true') {
+                var loggedUser = sessionStorage.getItem('panelLoggedUser') || DEFAULT_USER;
+                document.getElementById('loginOverlay').classList.add('hidden');
+                document.getElementById('settingsCurUser').value = loggedUser;
+            } else {
+                loadUserRemember();
+            }
+            if (!fbUsersLoaded) loadFBUsers();
+        }
+
+        // --- INIT & LISTENERS ---
+        window.onload = function() { 
+            checkUserAuth();
+            loadFormState();
+            
+            // Add listeners to auto-save on input change
+            formIds.forEach(id => {
+                let el = document.getElementById(id);
+                if(el && !id.includes('-actionTxt')) {
+                    el.addEventListener('input', saveFormState);
+                    el.addEventListener('change', saveFormState);
+                }
+            });
+            
+            applyOnUI(); 
+            applyOffUI(); 
+            loadOfflineData(); 
+        };
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !document.getElementById('loginOverlay').classList.contains('hidden')) {
+                userLogin();
+            }
+        });
+    </script>
+</body>
+</html>
