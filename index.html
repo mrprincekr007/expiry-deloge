@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deloge - User Panel</title>
+    <link rel="icon" type="image/png" href="logo.png?v=3">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Shared Firebase Config -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg: #05060c;
+            --bg2: #0a0d18;
+            --card: rgba(16, 20, 36, 0.94);
+            --card-solid: #121626;
+            --primary: #B366FF;
+            --pri2: #7C3AED;
+            --pri3: #4F46E5;
+            --text: #ffffff;
+            --text2: #a8adc7;
+            --text3: #676c8f;
+            --danger: #FF4C6A;
+            --success: #00E6A0;
+            --warning: #FFB300;
+            --border: rgba(179,102,255,0.16);
+            --glow: 0 0 30px rgba(179,102,255,0.25);
+            --radius: 20px;
+            --radius-sm: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; outline: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+        button, a, input, select, textarea, .btn, .menu-item, .menu-btn, .filter-btn, .btn-small, .select-btn, .close-menu-btn, .modal-close, .close-preview-btn { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; outline: none; }
+        .btn, .menu-item, .filter-btn, .btn-small, .select-btn, .close-menu-btn, .menu-btn, .select-option, .pv-button, .close-preview-btn { -webkit-user-select: none; user-select: none; }
+        button:active, a:active, .btn:active, .menu-item:active, .filter-btn:active, .btn-small:active, .select-option:active { -webkit-tap-highlight-color: transparent; }
+
+        ::selection { background: rgba(179,102,255,0.35); color: #fff; }
+
+        body { background: var(--bg); color: var(--text); display: flex; height: 100vh; height: 100dvh; overflow: hidden; position: relative; }
+        body::before, body::after {
+            content: ''; position: fixed; width: 420px; height: 420px; border-radius: 50%;
+            filter: blur(80px); opacity: 0.14; z-index: 0; pointer-events: none;
+            animation: orbFloat 18s ease-in-out infinite; will-change: transform;
+        }
+        body::before { background: var(--primary); top: -140px; right: -120px; }
+        body::after { background: var(--pri3); bottom: -160px; left: -120px; animation-delay: -7s; }
+        @keyframes orbFloat { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(45px) scale(1.08); } }
+
+        /* === SIDEBAR === */
+        .sidebar { width: 270px; background: linear-gradient(180deg, rgba(14,17,30,0.98), rgba(10,12,22,0.99)); height: 100vh; height: 100dvh; position: fixed; left: -270px; z-index: 1000; transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; border-right: 1px solid var(--border); box-shadow: 10px 0 50px rgba(0,0,0,0.5), inset -1px 0 0 rgba(179,102,255,0.06); }
+        .sidebar::before { content:''; position:absolute; top:-70px; right:-70px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, rgba(179,102,255,0.16), transparent 70%); pointer-events:none; }
+        .sidebar::after { content:''; position:absolute; bottom:-50px; left:-70px; width:200px; height:200px; border-radius:50%; background:radial-gradient(circle, rgba(79,70,229,0.14), transparent 70%); pointer-events:none; }
+        .sidebar.active { left: 0; }
+        .sidebar-header { padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); margin-bottom: 12px; position: sticky; top: 0; background: rgba(12,15,26,0.97); z-index: 10; }
+        .sidebar-logo { display: flex; align-items: center; gap: 12px; }
+        .logo-box { width: 44px; height: 44px; border-radius: 13px; background: linear-gradient(135deg,var(--primary),var(--pri3)); display: flex; align-items: center; justify-content: center; font-size: 19px; color: #fff; box-shadow: 0 8px 22px rgba(179,102,255,0.45), inset 0 1px 0 rgba(255,255,255,0.25); position: relative; flex-shrink: 0; }
+        .logo-box::after { content:''; position: absolute; inset: 0; border-radius: 13px; background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 50%); pointer-events: none; }
+        .sidebar-logo h3 { font-size: 16px; font-weight: 800; margin: 0; line-height: 1.1; background: linear-gradient(135deg,var(--primary),var(--pri3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 12px rgba(179,102,255,0.4)); letter-spacing: 1px; }
+        .sidebar-logo span { font-size: 9px; letter-spacing: 2.5px; color: var(--text3); text-transform: uppercase; font-weight: 600; }
+        .close-menu-btn { background: rgba(8,11,20,0.8); border: 1px solid var(--border); color: var(--text2); font-size: 16px; cursor: pointer; transition: 0.3s; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .close-menu-btn:hover { color: var(--danger); border-color: var(--danger); transform: rotate(90deg); }
+        .menu-category { padding: 16px 26px 6px; color: var(--text3); font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+        .menu-category::before { content:''; width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg,var(--primary),var(--pri3)); box-shadow: 0 0 8px var(--primary); flex-shrink: 0; }
+        .menu-item { padding: 9px 12px; display: flex; align-items: center; color: var(--text2); text-decoration: none; font-size: 13px; cursor: pointer; transition: 0.28s; margin: 3px 14px; border-radius: 12px; gap: 12px; border: 1px solid transparent; position: relative; font-weight: 500; }
+        .menu-item i { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 9px; font-size: 14px; transition: 0.3s; flex-shrink: 0; }
+        .menu-item:hover { background: rgba(179,102,255,0.08); color: var(--text); transform: translateX(4px); }
+        .menu-item:hover i { background: rgba(179,102,255,0.15); border-color: rgba(179,102,255,0.3); color: var(--primary); transform: scale(1.06); }
+        .menu-item.active { background: linear-gradient(135deg,rgba(179,102,255,0.2),rgba(79,70,229,0.12)); color: var(--primary); border: 1px solid rgba(179,102,255,0.3); box-shadow: 0 0 22px rgba(179,102,255,0.14), inset 0 0 20px rgba(179,102,255,0.05); font-weight: 600; }
+        .menu-item.active::before { content:''; position:absolute; left:-15px; top:50%; transform:translateY(-50%); width:4px; height:26px; border-radius:0 4px 4px 0; background: linear-gradient(180deg,var(--primary),var(--pri3)); box-shadow: 0 0 12px var(--primary); }
+        .menu-item.active i { background: linear-gradient(135deg,var(--primary),var(--pri2)); color: #fff; border-color: transparent; box-shadow: 0 4px 14px rgba(179,102,255,0.45); }
+        .sidebar-footer { margin-top: auto; padding: 14px; border-top: 1px solid var(--border); }
+        .sf-user { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 14px; background: linear-gradient(135deg,rgba(179,102,255,0.14),rgba(79,70,229,0.08)); border: 1px solid rgba(179,102,255,0.18); }
+        .sf-avatar { width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(135deg,var(--primary),var(--pri3)); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; box-shadow: 0 6px 18px rgba(179,102,255,0.4); flex-shrink: 0; }
+        .sf-user strong { font-size: 13px; display: block; color: var(--text); line-height: 1.2; }
+        .sf-user span { font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+        .sf-dot { width: 8px; height: 8px; border-radius: 50%; background: #00E676; margin-left: auto; box-shadow: 0 0 10px rgba(0,230,118,0.7); animation: pulse 2s infinite; flex-shrink: 0; }
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); z-index: 999; display: none; opacity: 0; transition: 0.35s; }
+        .overlay.active { display: block; opacity: 1; }
+
+        /* === MAIN === */
+        .main-content { flex: 1; padding: 20px; margin-left: 0; overflow-y: auto; overflow-x: hidden; width: 100%; position: relative; z-index: 1; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+        @media(min-width:901px){ .sidebar { left: 0; } .overlay { display: none !important; } .main-content { margin-left: 270px; padding: 28px 40px; } .close-menu-btn { display: none; } .topbar { position: static !important; } }
+        .topbar { display: flex; align-items: center; margin-bottom: 22px; gap: 14px; position: sticky; top: 10px; z-index: 40; padding: 10px 16px; border-radius: 22px; background: rgba(12,15,26,0.97); border: 1px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06); }
+        .menu-btn { background: rgba(8,11,20,0.8); border: 1px solid var(--border); color: var(--text); font-size: 17px; cursor: pointer; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.4); flex-shrink: 0; }
+        .menu-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: var(--glow); }
+        @media(min-width:901px){ .menu-btn { display: none; } }
+        .page-title { font-size: 18px; font-weight: 700; background: linear-gradient(135deg,var(--primary),var(--pri3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.5px; filter: drop-shadow(0 0 12px rgba(179,102,255,0.35)); }
+        .bell-btn { margin-left: auto; position: relative; background: rgba(8,11,20,0.8); border: 1px solid var(--border); color: var(--text2); font-size: 16px; cursor: pointer; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.4); flex-shrink: 0; }
+        .bell-btn:hover { color: var(--primary); border-color: var(--primary); box-shadow: 0 4px 20px rgba(179,102,255,0.4); }
+        .bell-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 10px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; display: none; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(255,76,106,0.5); border: 1px solid rgba(255,255,255,0.2); }
+        #notifList { margin-top: 16px; overflow-y: auto; max-height: 58vh; padding-right: 4px; }
+        .notif-item { padding: 14px; border-radius: 14px; background: rgba(10,13,24,0.4); border: 1px solid var(--border); margin-bottom: 10px; transition: 0.3s; }
+        .notif-item.unread { background: rgba(179,102,255,0.08); border-color: rgba(179,102,255,0.3); }
+        .notif-item p { font-size: 13px; color: var(--text); line-height: 1.5; margin: 0; word-break: break-word; }
+        .notif-item small { font-size: 10px; color: var(--text3); margin-top: 6px; display: block; }
+
+        .page { display: none; animation: fadeUp 0.45s ease; }
+        .page.active { display: block; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+        @keyframes orbFloat { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(45px) scale(1.08); } }
+
+        /* === CARD === */
+        .card { background: var(--card); padding: 24px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 22px; box-shadow: 0 10px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05); transition: 0.3s; }
+        .card:hover { border-color: rgba(179,102,255,0.28); box-shadow: 0 14px 50px rgba(0,0,0,0.5), 0 0 30px rgba(179,102,255,0.08); }
+        .settings-card { max-width: 500px; margin: 0 auto; }
+        #page-settings .settings-card + .settings-card { margin-top: 20px; }
+        @media(min-width:901px){ .settings-card { max-width: none; width: 100%; } .settings-card input, .settings-card button.btn { font-size: 15px; padding: 14px 16px; } }
+        .profile-alert { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 18px; border-radius: 16px; margin-bottom: 22px; background: linear-gradient(135deg, rgba(179,102,255,0.14), rgba(124,58,237,0.1)); border: 1px solid rgba(179,102,255,0.4); color: var(--text2); font-size: 13px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+        .profile-alert i { color: var(--primary); font-size: 20px; flex-shrink: 0; }
+
+        /* === DASHBOARD === */
+        .dash-title { font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; color: var(--text2); letter-spacing: 1px; }
+        .dash-title i { color: var(--primary); }
+        .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+        .stat-box { padding: 20px 16px; border-radius: 18px; text-align: center; position: relative; overflow: hidden; transition: 0.35s; cursor: default; }
+        .stat-box::before { content:''; position:absolute; top:-60%; right:-60%; width:100%; height:100%; border-radius:50%; opacity:0.1; }
+        .stat-box:hover { transform: translateY(-4px); }
+        .stat-box.online { background: linear-gradient(135deg,rgba(124,58,237,0.28),rgba(22,11,54,0.65)); border:1px solid rgba(179,102,255,0.3); box-shadow: 0 8px 30px rgba(124,58,237,0.15); }
+        .stat-box.offline { background: linear-gradient(135deg,rgba(0,230,160,0.16),rgba(4,28,24,0.6)); border:1px solid rgba(0,230,160,0.25); box-shadow: 0 8px 30px rgba(0,230,160,0.1); }
+        .stat-box.danger { background: linear-gradient(135deg,rgba(255,76,106,0.18),rgba(35,8,22,0.6)); border:1px solid rgba(255,76,106,0.28); box-shadow: 0 8px 30px rgba(255,76,106,0.1); }
+        .stat-box h3 { font-size: 34px; font-weight: 800; margin: 4px 0; }
+        .stat-box p { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; opacity: 0.75; }
+        .stat-box.online h3 { background:linear-gradient(135deg,var(--primary),#d8aaff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; filter: drop-shadow(0 0 10px rgba(179,102,255,0.4)); }
+        .stat-box.offline h3 { background:linear-gradient(135deg,var(--success),#69f0ae); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .stat-box.danger h3 { background:linear-gradient(135deg,var(--danger),#ff8a80); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+        /* === FORMS === */
+        .category-box { background: rgba(10,13,24,0.55); border: 1px solid var(--border); padding: 18px; border-radius: var(--radius-sm); margin-bottom: 16px; transition: 0.3s; }
+        .category-box:hover { border-color: rgba(179,102,255,0.3); box-shadow: 0 0 20px rgba(179,102,255,0.06); }
+        .category-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px; }
+        .form-group { margin-bottom: 14px; }
+        label { display: block; font-size: 10px; color: var(--text3); margin-bottom: 5px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        input, textarea, select { width: 100%; padding: 12px 14px; background: rgba(8,11,20,0.75); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; transition: 0.25s; font-family: 'Poppins', sans-serif; color-scheme: dark; }
+        input:focus, textarea:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(179,102,255,0.12), 0 0 20px rgba(179,102,255,0.15); background: rgba(12,16,28,0.9); }
+        input[type="color"] { padding: 4px; height: 44px; cursor: pointer; }
+        input[type="number"] { padding: 10px 14px; }
+        textarea { resize: vertical; min-height: 70px; }
+        select { cursor: pointer; }
+        select option { background: var(--card-solid); color: var(--text); }
+
+        .btn { width: 100%; padding: 14px; background: linear-gradient(135deg,var(--primary),var(--pri2)); color: #fff; border: none; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 0.8px; font-size: 13px; display: flex; justify-content: center; align-items: center; gap: 8px; position: relative; overflow: hidden; box-shadow: 0 6px 20px rgba(124,58,237,0.3); }
+        .btn::after { content:''; position:absolute; top:0; left:-130%; width:60%; height:100%; background:linear-gradient(120deg,transparent,rgba(255,255,255,0.35),transparent); transform: skewX(-25deg); transition: left 0.6s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(179,102,255,0.45); }
+        .btn:hover::after { left: 140%; }
+        .btn:active { transform: scale(0.97); }
+        .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); box-shadow: none; }
+        .btn-outline::after { display: none; }
+        .btn-outline:hover { background: rgba(179,102,255,0.08); box-shadow: var(--glow); }
+        .btn-reset { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: var(--text3); box-shadow: none; }
+        .btn-reset::after { display: none; }
+        .btn-reset:hover { border-color: var(--danger); color: var(--danger); background: rgba(255,76,106,0.08); box-shadow: 0 0 20px rgba(255,76,106,0.2); transform: translateY(-2px); }
+
+        .ui-header { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; padding: 18px 20px; border-radius: 18px; background: linear-gradient(135deg, rgba(179,102,255,0.15), rgba(79,70,229,0.06)); border: 1px solid var(--border); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); }
+        .ui-header-icon { width: 54px; height: 54px; border-radius: 16px; background: linear-gradient(135deg, var(--primary), var(--pri3)); display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; box-shadow: 0 8px 25px rgba(179,102,255,0.4); flex-shrink: 0; }
+        .ui-header h3 { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, var(--primary), #d8aaff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 3px; letter-spacing: 0.3px; }
+        .ui-header p { font-size: 12px; color: var(--text3); }
+        .theme-custom { border-color: rgba(179,102,255,0.35) !important; }
+        .theme-custom .select-btn { font-weight: 600; background: rgba(8,11,20,0.85); }
+        .theme-custom .select-btn i { color: var(--primary); }
+
+        .generate-grid { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 30px; }
+        @media(max-width:1100px){ .generate-grid { grid-template-columns: 1fr; gap: 24px; } }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media(max-width:600px){ .form-row { grid-template-columns: 1fr; gap: 10px; } }
+
+        /* === CUSTOM SELECT === */
+        .custom-select { position: relative; width: 100%; user-select: none; }
+        .custom-select.active { z-index: 10000; }
+        .select-btn { width:100%; padding:12px 14px; background:rgba(8,11,20,0.75); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); font-size:13px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:0.25s; }
+        .select-btn:hover { border-color: var(--primary); }
+        .select-dropdown { position:absolute; white-space:nowrap; background:var(--card-solid); border:1px solid rgba(179,102,255,0.35); border-radius:var(--radius-sm); box-shadow:0 10px 30px rgba(0,0,0,0.7), 0 0 20px rgba(179,102,255,0.1); z-index:9999; overflow:visible; opacity:0; visibility:hidden; transform:translateY(-4px); transition:0.2s; pointer-events:none; max-height:280px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; }
+        .custom-select.active .select-dropdown { opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+        .select-option { padding:12px 14px; cursor:pointer; transition:0.2s; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.04); }
+        .select-option:hover { background:rgba(179,102,255,0.12); color:var(--primary); padding-left:18px; }
+
+        /* === PREVIEW === */
+        .preview-wrapper { background:#14141c; padding:25px 22px; box-shadow:0 10px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(179,102,255,0.08), 0 0 40px rgba(179,102,255,0.06); font-family:sans-serif; text-align:left; width:100%; max-width:340px; margin:0 auto; position:sticky; top:30px; transition:0.3s; border:0px solid transparent; border-radius:0; }
+        .pv-top-container { text-align:center; margin-bottom:12px; padding-top:4px; }
+        .pv-top-tag { display:inline-block; border:1px solid #FF4C4C; color:#FF4C4C; padding:4px 14px; border-radius:20px; font-size:10px; font-weight:bold; background:rgba(255,76,76,0.1); animation:pulse 1.5s infinite ease-in-out; }
+        .pv-header { display:flex; align-items:center; margin-bottom:14px; }
+        .pv-logo { width:48px; height:48px; border-radius:50%; object-fit:cover; margin-right:14px; border:2px solid #333; background:#2A2A2C; display:flex; align-items:center; justify-content:center; font-size:18px; color:#aaa; }
+        .pv-title { color:white; font-size:15px; font-weight:bold; margin-bottom:2px; line-height:1.2; }
+        .pv-subtitle { color:#B366FF; font-size:11px; font-weight:bold; }
+        .pv-body { color:#A0A0A0; font-size:12px; margin-bottom:14px; line-height:1.4; white-space:pre-wrap; }
+        .pv-whatsnew-box { background:#2A2A2C; border-radius:12px; padding:16px; margin-bottom:18px; }
+        .pv-wn-title { color:#B366FF; font-size:11px; font-weight:bold; margin-bottom:8px; }
+        .pv-bullet { color:white; font-size:12px; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+        .pv-bullet:last-child { margin-bottom:0; }
+        .pv-button { background:#B366FF; color:white; text-align:center; padding:11px; border-radius:12px; font-weight:bold; font-size:13px; width:100%; cursor:pointer; letter-spacing:1px; }
+        .pv-btn-row { display:flex; align-items:center; gap:10px; width:100%; }
+        .pv-btn-row .pv-button { flex:1; width:auto; }
+        .pv-close-btn { width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:15px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:0.25s; }
+        .pv-close-btn:hover { background:rgba(255,76,106,0.35); border-color:var(--danger); color:#fff; }
+
+        /* === MANAGE === */
+        .search-box { margin-bottom:16px; position:relative; }
+        .search-box input { padding-left:40px; }
+        .search-box i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:14px; }
+        .filter-container { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+        .filter-btn { padding:7px 14px; background:var(--bg2); border:1px solid var(--border); color:var(--text3); border-radius:20px; cursor:pointer; font-size:11px; font-weight:600; transition:0.25s; }
+        .filter-btn:hover { color: var(--text); border-color: var(--primary); }
+        .filter-btn.active { background:rgba(179,102,255,0.14); color:var(--primary); border-color:var(--primary); box-shadow: 0 0 14px rgba(179,102,255,0.15); }
+        .app-list { list-style:none; }
+        .app-item { background:rgba(10,13,24,0.55); border:1px solid var(--border); padding:16px; border-radius:var(--radius-sm); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; transition:0.3s; }
+        .app-item:hover { border-color:rgba(179,102,255,0.3); transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.3), 0 0 16px rgba(179,102,255,0.07); }
+        .app-info h4 { font-size:14px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+        .app-info p { font-size:11px; color:var(--text3); }
+        .app-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex-shrink:0; }
+        .btn-small { width:auto; min-width:36px; height:36px; border-radius:8px; border:none; cursor:pointer; font-size:12px; font-weight:600; transition:0.25s; display:flex; justify-content:center; align-items:center; padding:0 12px; }
+        .btn-view { background:rgba(52,152,219,0.15); color:#3498db; }
+        .btn-view:hover { background:#3498db; color:#fff; box-shadow: 0 0 14px rgba(52,152,219,0.4); }
+        .btn-edit { background:rgba(255,179,0,0.15); color:var(--warning); }
+        .btn-edit:hover { background:var(--warning); color:#000; box-shadow: 0 0 14px rgba(255,179,0,0.4); }
+        .btn-delete { background:rgba(255,76,76,0.15); color:var(--danger); }
+        .btn-delete:hover { background:var(--danger); color:#fff; box-shadow: 0 0 14px rgba(255,76,76,0.4); }
+        .btn-active { background:rgba(0,230,118,0.15); color:var(--success); }
+        .btn-active:hover { background:var(--success); color:#000; box-shadow: 0 0 14px rgba(0,230,118,0.4); }
+        .btn-inactive { background:rgba(255,255,255,0.05); color:var(--text3); }
+        .btn-inactive:hover { background:rgba(255,255,255,0.1); color:var(--text2); }
+        .btn-expired { background:rgba(255,76,76,0.15); color:var(--danger); }
+        .btn-expired:hover { background:var(--danger); color:#fff; box-shadow: 0 0 14px rgba(255,76,76,0.4); }
+        .badge { padding:3px 10px; border-radius:20px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+        .b-active { background:rgba(0,230,118,0.1); color:var(--success); border:1px solid rgba(0,230,118,0.25); }
+        .b-expired { background:rgba(255,76,76,0.1); color:var(--danger); border:1px solid rgba(255,76,76,0.25); }
+
+        .code-output-container { background:rgba(10,13,24,0.7); border:1px solid var(--primary); border-radius:var(--radius-sm); padding:18px; margin-top:18px; display:none; animation:fadeUp 0.4s forwards; text-align:center; box-shadow: 0 0 25px rgba(179,102,255,0.15); }
+        .code-output-container h4 { color:var(--primary); margin-bottom:12px; font-size:14px; }
+        .code-output-container pre { display:none !important; }
+
+        /* === LOGIN === */
+        .login-overlay { position:fixed; inset:0; background:radial-gradient(ellipse at center,#1A0F2E 0%,#05060c 100%); z-index:99999; display:flex; justify-content:center; align-items:center; padding:20px; overflow:hidden; }
+        .login-overlay::before, .login-overlay::after { content:''; position:absolute; width:420px; height:420px; border-radius:50%; filter:blur(120px); opacity:0.22; animation:orbFloat 12s ease-in-out infinite; }
+        .login-overlay::before { background:var(--primary); top:-120px; right:-100px; }
+        .login-overlay::after { background:var(--pri3); bottom:-140px; left:-100px; animation-delay:-6s; }
+        .login-overlay.hidden { display:none; }
+        .login-card { background:rgba(16,20,36,0.92); padding:40px 32px; border-radius:24px; width:100%; max-width:400px; border:1px solid rgba(179,102,255,0.18); box-shadow:0 25px 80px rgba(0,0,0,0.7), 0 0 60px rgba(179,102,255,0.08); animation:fadeUp 0.5s ease; position:relative; z-index:1; }
+        .login-logo { text-align:center; margin-bottom:22px; }
+        .login-logo i { font-size:45px; color:var(--primary); filter: drop-shadow(0 0 18px rgba(179,102,255,0.6)); }
+        .login-logo h1 { font-size:20px; font-weight:800; margin-top:8px; background:linear-gradient(135deg,var(--primary),#d8aaff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .login-logo p { color:#888; font-size:12px; margin-top:4px; }
+        .login-error { color:var(--danger); font-size:12px; display:none; margin-bottom:12px; text-align:center; }
+
+        /* === MODALS === */
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:2000; justify-content:center; align-items:center; padding:10px; }
+        .modal.show { display:flex; }
+        .modal-content { background:rgba(16,20,36,0.97); padding:24px; border-radius:var(--radius); width:95%; max-width:700px; max-height:85vh; display:flex; flex-direction:column; position:relative; border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(179,102,255,0.08); }
+        .modal-close { position:absolute; top:14px; right:18px; font-size:24px; color:var(--text3); cursor:pointer; transition:0.3s; }
+        .modal-close:hover { color:var(--text); transform:rotate(90deg); }
+        .modal-header h3 { color:var(--primary); font-size:18px; margin-bottom:4px; }
+        .modal pre { background:rgba(5,7,13,0.9); padding:18px; border-radius:var(--radius-sm); overflow:auto; flex:1; color:#a8ff78; font-size:12px; margin:12px 0; border:1px solid var(--border); white-space:pre-wrap; word-wrap:break-word; display:block !important; max-height:60vh; }
+
+        /* === FULLSCREEN PREVIEW === */
+        #fullPreviewModal { display:none; position:fixed; inset:0; z-index:3000; justify-content:center; align-items:center; padding:20px; }
+        #fullPreviewModal.show { display:flex; }
+        .close-preview-btn { position:absolute; bottom:30px; padding:10px 24px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; border-radius:30px; font-size:13px; font-weight:600; cursor:pointer; backdrop-filter:blur(8px); z-index:3001; transition:0.3s; }
+        .close-preview-btn:hover { background:rgba(255,255,255,0.15); }
+
+        /* === TOAST === */
+        .toast { position:fixed; bottom:-60px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,var(--success),#00c853); color:#000; padding:12px 24px; border-radius:30px; font-weight:600; font-size:13px; box-shadow:0 10px 30px rgba(0,0,0,0.5); transition:0.4s cubic-bezier(0.4,0,0.2,1); z-index:9999; display:flex; align-items:center; gap:8px; white-space:nowrap; }
+        .toast.show { bottom:24px; }
+
+        /* === SCROLLBAR === */
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:linear-gradient(180deg,var(--primary),var(--pri3)); border-radius:10px; }
+
+        /* === RESPONSIVE === */
+        @media(max-width:600px){
+            .main-content { padding:14px; }
+            .card { padding:16px; }
+            .stat-box h3 { font-size:28px; }
+            .dash-grid { grid-template-columns:repeat(3,1fr); gap:10px; }
+            .stat-box { padding:14px 10px; }
+            .stat-box p { font-size:8px; }
+            .topbar { margin: 6px 0 16px; top: 8px; padding: 8px 12px; border-radius: 20px; }
+            .menu-btn { width: 40px; height: 40px; font-size: 15px; }
+            .bell-btn { width: 40px; height: 40px; font-size: 15px; }
+            .sidebar { width:260px; left:-260px; }
+            .preview-wrapper { max-width:100%; position:static; }
+            .generate-grid { gap:16px; }
+            .login-card { padding:30px 22px; }
+            .filter-container { gap:5px; }
+            .filter-btn { padding:5px 10px; font-size:10px; }
+            .filter-container .btn-delete { height:auto; min-height:28px; padding:4px 9px; font-size:10px; }
+        }
+        @media(max-width:400px){
+            .dash-grid { grid-template-columns:1fr 1fr; }
+            .page-title { font-size:15px; }
+            .app-item { flex-direction:column; align-items:stretch; }
+        }
+        .main-content { padding-bottom: 90px; }
+        .sidebar { padding-bottom: 30px; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN OVERLAY -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-card">
+            <div class="login-logo"><i class="fas fa-user-lock"></i><h1>USER LOGIN</h1><p>Login karo apne account se. Nayi account ke liye admin se contact karein!</p></div>
+            <div id="loginFormContainer">
+                <div class="form-group"><label>Username</label><input type="text" id="loginUser" placeholder="Enter username"></div>
+                <div class="form-group"><label>Password</label><input type="password" id="loginPass" placeholder="Enter password"></div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:15px;">
+                    <input type="checkbox" id="savePass" onchange="saveUserRemember()" style="width:auto;accent-color:#B366FF;cursor:pointer;">
+                    <label style="margin:0;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;color:#aaa;">Save Password</label>
+                </div>
+                <div class="login-error" id="loginError">Invalid credentials!</div>
+                <button class="btn" onclick="userLogin()"><i class="fas fa-arrow-right"></i> LOGIN</button>
+            </div>
+            <div style="margin-top:22px;padding-top:16px;border-top:1px solid rgba(179,102,255,0.15);text-align:center;">
+                <p style="color:var(--text3);font-size:11px;font-weight:600;letter-spacing:0.5px;margin-bottom:12px;"><i class="fas fa-id-badge"></i> NAYI ACCOUNT CHAHIYE? ADMIN SE BAAT KAREIN</p>
+                <div style="display:flex;gap:10px;">
+                    <button class="btn" style="flex:1;width:auto;background:linear-gradient(135deg,#25D366,#128C7E);box-shadow:0 6px 20px rgba(37,211,102,0.25);white-space:nowrap;" onclick="openSupportLink('wa')"><i class="fab fa-whatsapp"></i> <span id="loginWaText">WhatsApp</span></button>
+                    <button class="btn" style="flex:1;width:auto;background:linear-gradient(135deg,#229ED9,#0088cc);box-shadow:0 6px 20px rgba(34,158,217,0.25);white-space:nowrap;" onclick="openSupportLink('tg')"><i class="fab fa-telegram-plane"></i> <span id="loginTgText">Telegram</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+
+    <!-- 8 MENUS SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <div class="logo-box"><i class="fas fa-crown"></i></div>
+                <div><h3>DELOGE</h3><span>User Panel</span></div>
+            </div>
+            <button class="close-menu-btn" onclick="toggleMenu()"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <div class="menu-category">MAIN</div>
+        <a class="menu-item active" onclick="switchPage('dashboard', this)"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        
+        <div class="menu-category" style="color:var(--primary);">ONLINE API SYSTEM</div>
+        <a class="menu-item" onclick="switchPage('gen-on', this)"><i class="fas fa-wifi"></i> Generate Online</a>
+        <a class="menu-item" onclick="switchPage('man-on', this)"><i class="fas fa-server"></i> Manage Online Apps</a>
+        <a class="menu-item" onclick="switchPage('ui-on', this)"><i class="fas fa-palette"></i> Manage UI (Online)</a>
+        
+        <div class="menu-category" style="color:var(--primary);">OFFLINE LOCAL SYSTEM</div>
+        <a class="menu-item" onclick="switchPage('gen-off', this)"><i class="fas fa-power-off"></i> Generate Offline</a>
+        <a class="menu-item" onclick="switchPage('man-off', this)"><i class="fas fa-history"></i> Offline History</a>
+        <a class="menu-item" onclick="switchPage('ui-off', this)"><i class="fas fa-paint-brush"></i> Manage UI (Offline)</a>
+        
+        <div class="menu-category" style="color:var(--primary);">SUPPORT</div>
+        <a class="menu-item" onclick="switchPage('support', this)"><i class="fas fa-headset"></i> Support & Tickets</a>
+        
+        <div class="menu-category" style="color:var(--primary);">ACCOUNT</div>
+        <a class="menu-item" onclick="switchPage('settings', this)"><i class="fas fa-cog"></i> Settings</a>
+        <a class="menu-item" onclick="userLogout()" style="color:var(--danger);"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        
+        <div class="sidebar-footer">
+            <div class="sf-user">
+                <div class="sf-avatar"><i class="fas fa-user"></i></div>
+                <div><strong id="sidebarUserName">Guest</strong><span>Logged In</span></div>
+                <div class="sf-dot"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content" id="mainContent">
+        <div class="topbar">
+            <button class="menu-btn" onclick="toggleMenu()"><i class="fas fa-bars"></i></button>
+            <div class="page-title" id="pageTitle">DASHBOARD</div>
+            <button class="bell-btn" onclick="openNotifications()" title="Notifications"><i class="fas fa-bell"></i><span class="bell-badge" id="bellBadge">0</span></button>
+        </div>
+
+        <!-- 1. DASHBOARD -->
+        <div class="page active" id="page-dashboard">
+            <div class="profile-alert" id="profileAlert" style="display:none;">
+                <i class="fas fa-user-edit"></i>
+                <span>Aapne abhi tak apni details nahi bhari hai. Settings me jaakar apna Name, Contact, YouTube aur Telegram add karein!</span>
+                <button class="btn" onclick="switchPage('settings'); closeMenu();" style="margin-left:auto;padding:10px 18px;flex-shrink:0;"><i class="fas fa-arrow-right"></i> FILL DETAILS</button>
+            </div>
+            <div class="dash-title"><i class="fas fa-wifi"></i> Online Apps (Firebase)</div>
+            <div class="dash-grid">
+                <div class="stat-box online"><p>Total Codes</p><h3 id="stat-on-total">0</h3></div>
+                <div class="stat-box online"><p>Active</p><h3 id="stat-on-active">0</h3></div>
+                <div class="stat-box danger"><p>Expired</p><h3 id="stat-on-expired">0</h3></div>
+            </div>
+
+            <div class="dash-title" style="margin-top: 40px;"><i class="fas fa-power-off"></i> Offline Apps (Local Timer)</div>
+            <div class="dash-grid">
+                <div class="stat-box offline"><p>Total Generated</p><h3 id="stat-off-total">0</h3></div>
+                <div class="stat-box offline"><p>Active Timer</p><h3 id="stat-off-active">0</h3></div>
+                <div class="stat-box danger"><p>Expired Locked</p><h3 id="stat-off-expired">0</h3></div>
+            </div>
+        </div>
+
+        <!-- 2. GENERATE ONLINE -->
+        <div class="page" id="page-gen-on">
+            <div class="generate-grid">
+                <div class="card" style="margin-bottom: 0;">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;"><i class="fas fa-cloud-upload-alt"></i> Build Online Code</h3>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-info-circle"></i> Basic Info</div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom:0;"><label>App Name</label><input type="text" id="on-appName" placeholder="e.g. Mod V1"></div>
+                            <div class="form-group" style="margin-bottom:0;"><label>Auto Expiry Time</label><input type="datetime-local" id="on-expiryDate"></div>
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-image"></i> Header Setup</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Top Tag</label><input type="text" id="on-topTag" value="⚠️ Required Update" oninput="updateOnPreview()"></div>
+                            <div class="form-group"><label>Logo URL (Leave blank for default)</label><input type="url" id="on-logoUrl" placeholder="Leave empty for Default Logo" oninput="updateOnPreview()"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Main Title</label><input type="text" id="on-popTitle" value="New Update Available! 🚀" oninput="updateOnPreview()"></div>
+                            <div class="form-group"><label>Subtitle</label><input type="text" id="on-subTitle" value="Version 2.0.0" oninput="updateOnPreview()"></div>
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-align-left"></i> Messages</div>
+                        <div class="form-group"><label>Body Message</label><textarea id="on-popMsg" rows="3" oninput="updateOnPreview()">We've added new features and fixed bugs.&#10;Update now!</textarea></div>
+                        <label>What's New Points</label>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <input type="text" id="on-wn1" value="✅ New UI design" oninput="updateOnPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="on-wn2" value="🐛 Bug fixes" oninput="updateOnPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="on-wn3" value="⚡ Performance improvements" oninput="updateOnPreview()">
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-mouse-pointer"></i> Button Action</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Button Text</label><input type="text" id="on-btnText" value="UPDATE NOW" oninput="updateOnPreview()"></div>
+                            <div class="form-group">
+                                <label>Action</label>
+                                <div class="custom-select" id="on-actionSel">
+                                    <div class="select-btn" onclick="toggleDropdown('on-actionDropdown')"><span id="on-actionTxt">Open URL</span><i class="fas fa-chevron-down"></i></div>
+                                    <div class="select-dropdown" id="on-actionDropdown">
+                                        <div class="select-option" onclick="selectAction('link', 'Open URL', 'on')">Open URL</div>
+                                        <div class="select-option" onclick="selectAction('exit', 'Close Popup', 'on')">Close Popup</div>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="on-btnAction" value="link">
+                            </div>
+                        </div>
+                        <div class="form-group" id="on-linkContainer" style="margin-bottom:0;"><label>URL Link</label><input type="url" id="on-linkUrl" value="https://t.me/+4hk87cVq1GUyMTNl"></div>
+                    </div>
+                    
+                    <button class="btn" onclick="generateOnlineCode()"><i class="fas fa-magic"></i> GENERATE ONLINE CODE</button>
+                    
+                    <!-- INLINE OUTPUT (Only Copy Button) -->
+                    <div class="code-output-container" id="on-outputBox">
+                        <h4><i class="fas fa-check-circle"></i> Success! Online Java Generated.</h4>
+                        <pre id="on-codeResult"></pre>
+                        <button class="btn" onclick="copyInlineCode('on')"><i class="fas fa-copy"></i> COPY JAVA CODE</button>
+                    </div>
+                </div>
+                
+                <div>
+                    <label style="margin-bottom: 15px; display:block; text-align: center;">Live UI Preview</label>
+                    <div class="preview-wrapper" id="pv-on-wrapper">
+                        <div class="pv-top-container"><span class="pv-top-tag" id="pv-on-tag">⚠️ Required Update</span></div>
+                        <div class="pv-header">
+                            <img src="" id="pv-on-logo" class="pv-logo">
+                            <div><div class="pv-title" id="pv-on-title">Title</div><div class="pv-subtitle" id="pv-on-subtitle">Sub</div></div>
+                        </div>
+                        <div class="pv-body" id="pv-on-body">Msg</div>
+                        <div class="pv-whatsnew-box" id="pv-on-box">
+                            <div class="pv-wn-title" id="pv-on-wntitle">What's New</div>
+                            <div class="pv-bullet" id="pv-on-wn1">1</div><div class="pv-bullet" id="pv-on-wn2">2</div><div class="pv-bullet" id="pv-on-wn3">3</div>
+                        </div>
+                        <div class="pv-btn-row">
+                            <div class="pv-button" id="pv-on-btn">BTN</div>
+                            <div class="pv-close-btn" onclick="closeModal('fullPreviewModal')">✕</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. MANAGE ONLINE -->
+        <div class="page" id="page-man-on">
+            <div class="card" style="background: transparent; border: none; box-shadow: none; padding: 0;">
+                <div class="search-box"><i class="fas fa-search"></i><input type="text" id="on-searchInput" placeholder="Search Online Apps..." onkeyup="renderOnList()"></div>
+                <div class="filter-container">
+                    <button class="filter-btn active" onclick="setOnFilter('All', this)">All Apps</button>
+                    <button class="filter-btn" onclick="setOnFilter('Active', this)">Active Only</button>
+                    <button class="filter-btn" onclick="setOnFilter('Expired', this)">Expired Only</button>
+                    <button class="btn-small btn-delete" style="margin-left:auto;" onclick="clearOnExpired()"><i class="fas fa-broom"></i> Clear Expired</button>
+                </div>
+                <ul class="app-list" id="on-appListContainer"><li style="text-align: center; color: #555; padding: 20px;">Loading...</li></ul>
+            </div>
+        </div>
+
+        <!-- 4. MANAGE UI ONLINE (ADVANCED) -->
+        <div class="page" id="page-ui-on">
+            <div class="card">
+                <div class="ui-header">
+                    <div class="ui-header-icon"><i class="fas fa-palette"></i></div>
+                    <div>
+                        <h3>Online UI Customization</h3>
+                        <p>Design your update popup - changes apply live</p>
+                    </div>
+                </div>
+
+                <div class="category-box theme-custom">
+                    <div class="category-title"><i class="fas fa-crown"></i> Premium Theme (10 Styles)</div>
+                    <div class="custom-select" id="on-themeSel">
+                        <div class="select-btn" onclick="toggleDropdown('on-themeDropdown')"><span id="on-themeTxt">1. Default Purple Pro</span><i class="fas fa-chevron-down"></i></div>
+                        <div class="select-dropdown" id="on-themeDropdown">
+                            <div class="select-option" data-value="1" onclick="selectTheme('on','1','1. Default Purple Pro')">1. Default Purple Pro</div>
+                            <div class="select-option" data-value="2" onclick="selectTheme('on','2','2. Midnight Sapphire')">2. Midnight Sapphire</div>
+                            <div class="select-option" data-value="3" onclick="selectTheme('on','3','3. Emerald Luxe')">3. Emerald Luxe</div>
+                            <div class="select-option" data-value="4" onclick="selectTheme('on','4','4. Royal Violet Glass')">4. Royal Violet Glass</div>
+                            <div class="select-option" data-value="5" onclick="selectTheme('on','5','5. Sunset Blaze')">5. Sunset Blaze</div>
+                            <div class="select-option" data-value="6" onclick="selectTheme('on','6','6. Cyber Cyan')">6. Cyber Cyan</div>
+                            <div class="select-option" data-value="7" onclick="selectTheme('on','7','7. Golden Crown')">7. Golden Crown</div>
+                            <div class="select-option" data-value="8" onclick="selectTheme('on','8','8. Apple Clean Light')">8. Apple Clean Light</div>
+                            <div class="select-option" data-value="9" onclick="selectTheme('on','9','9. Matrix Terminal')">9. Matrix Terminal</div>
+                            <div class="select-option" data-value="10" onclick="selectTheme('on','10','10. Cream Frost')">10. Cream Frost</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="onThemeSelect" value="1">
+                </div>
+
+                <div class="category-box">
+                    <div class="category-title"><i class="fas fa-palette"></i> Colors</div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Background Color</label><input type="color" id="onUiBg" value="#1c1c1e" oninput="applyOnUI()"></div>
+                        <div class="form-group"><label>Primary/Button Color</label><input type="color" id="onUiPrimary" value="#B366FF" oninput="applyOnUI()"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Main Text Color</label><input type="color" id="onUiText" value="#ffffff" oninput="applyOnUI()"></div>
+                        <div class="form-group"><label>Danger/Tag Color</label><input type="color" id="onUiDanger" value="#ff4c4c" oninput="applyOnUI()"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Border Thickness (0 for none)</label><input type="number" id="onUiBorderW" value="0" oninput="applyOnUI()"></div>
+                        <div class="form-group"><label>Border Color</label><input type="color" id="onUiBorderC" value="#ffffff" oninput="applyOnUI()"></div>
+                    </div>
+                </div>
+
+                <div class="category-box">
+                    <div class="category-title"><i class="fas fa-wand-magic-sparkles"></i> Effects &amp; Corners</div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Popup Corner Radius</label><input type="number" id="onUiRadius" value="60" oninput="applyOnUI()"></div>
+                        <div class="form-group"><label>Button Radius</label><input type="number" id="onUiBtnRadius" value="30" oninput="applyOnUI()"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Background Dim (0.0 to 1.0)</label><input type="number" step="0.05" id="onUiDim" value="0.25" oninput="applyOnUI()"></div>
+                        <div class="form-group"><label>Blur Radius (1 to 100)</label><input type="number" id="onUiBlur" value="25" oninput="applyOnUI()"></div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-outline" style="margin-bottom: 15px;" onclick="showFullScreenPreview('on')"><i class="fas fa-eye"></i> 100% FULL SCREEN PREVIEW</button>
+                <button class="btn" style="margin-bottom: 15px;" onclick="showToast('Online UI Saved!')"><i class="fas fa-save"></i> SAVE ONLINE UI</button>
+                <button class="btn btn-reset" onclick="applyThemePreset('on', '1')"><i class="fas fa-undo"></i> RESET TO DEFAULT</button>
+            </div>
+        </div>
+
+        <!-- 5. GENERATE OFFLINE -->
+        <div class="page" id="page-gen-off">
+            <div class="generate-grid">
+                <div class="card" style="margin-bottom: 0;">
+                    <h3 style="color: var(--primary); margin-bottom: 20px;"><i class="fas fa-power-off"></i> Build Offline Code</h3>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-info-circle"></i> App Info & Timer</div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom:0;"><label>App Name</label><input type="text" id="off-appName" placeholder="e.g. Mod V2"></div>
+                            <div class="form-group" style="margin-bottom:0;"><label>Auto-Expire Time (Required)</label><input type="datetime-local" id="off-expiryDate"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-image"></i> Header Setup</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Top Tag</label><input type="text" id="off-topTag" value="⚠️ Required Update" oninput="updateOffPreview()"></div>
+                            <div class="form-group"><label>Logo URL (Leave blank for default)</label><input type="url" id="off-logoUrl" placeholder="Leave empty for Default Logo" oninput="updateOffPreview()"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Main Title</label><input type="text" id="off-popTitle" value="New Update Available! 🚀" oninput="updateOffPreview()"></div>
+                            <div class="form-group"><label>Subtitle</label><input type="text" id="off-subTitle" value="Version 2.0.0" oninput="updateOffPreview()"></div>
+                        </div>
+                    </div>
+
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-align-left"></i> Messages</div>
+                        <div class="form-group"><label>Body Message</label><textarea id="off-popMsg" rows="3" oninput="updateOffPreview()">We've added new features and fixed bugs.&#10;Update now!</textarea></div>
+                        <label>What's New Points</label>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <input type="text" id="off-wn1" value="✅ New UI design" oninput="updateOffPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="off-wn2" value="🐛 Bug fixes" oninput="updateOffPreview()" style="margin-bottom: 10px;">
+                            <input type="text" id="off-wn3" value="⚡ Performance improvements" oninput="updateOffPreview()">
+                        </div>
+                    </div>
+
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-mouse-pointer"></i> Button Action</div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Button Text</label><input type="text" id="off-btnText" value="UPDATE NOW" oninput="updateOffPreview()"></div>
+                            <div class="form-group">
+                                <label>Action</label>
+                                <div class="custom-select" id="off-actionSel">
+                                    <div class="select-btn" onclick="toggleDropdown('off-actionDropdown')"><span id="off-actionTxt">Open URL</span><i class="fas fa-chevron-down"></i></div>
+                                    <div class="select-dropdown" id="off-actionDropdown">
+                                        <div class="select-option" onclick="selectAction('link', 'Open URL', 'off')">Open URL</div>
+                                        <div class="select-option" onclick="selectAction('exit', 'Close Popup', 'off')">Close Popup</div>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="off-btnAction" value="link">
+                            </div>
+                        </div>
+                        <div class="form-group" id="off-linkContainer" style="margin-bottom:0;"><label>URL Link</label><input type="url" id="off-linkUrl" value="https://t.me/+4hk87cVq1GUyMTNl"></div>
+                    </div>
+                    
+                    <button class="btn" onclick="generateOfflineCode()"><i class="fas fa-cogs"></i> GENERATE OFFLINE CODE</button>
+                    
+                    <!-- INLINE OUTPUT OFFLINE -->
+                    <div class="code-output-container" id="off-outputBox">
+                        <h4><i class="fas fa-check-circle"></i> Success! Offline Java Generated.</h4>
+                        <pre id="off-codeResult"></pre>
+                        <button class="btn" onclick="copyInlineCode('off')"><i class="fas fa-copy"></i> COPY JAVA CODE</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="margin-bottom: 15px; display:block; text-align: center;">Live Preview (Offline UI)</label>
+                    <div class="preview-wrapper" id="pv-off-wrapper">
+                        <div class="pv-top-container"><span class="pv-top-tag" id="pv-off-tag">⚠️ Required Update</span></div>
+                        <div class="pv-header">
+                            <img src="" id="pv-off-logo" class="pv-logo">
+                            <div><div class="pv-title" id="pv-off-title">Title</div><div class="pv-subtitle" id="pv-off-subtitle">Sub</div></div>
+                        </div>
+                        <div class="pv-body" id="pv-off-body">Msg</div>
+                        <div class="pv-whatsnew-box" id="pv-off-box">
+                            <div class="pv-wn-title" id="pv-off-wntitle">What's New</div>
+                            <div class="pv-bullet" id="pv-off-wn1">1</div><div class="pv-bullet" id="pv-off-wn2">2</div><div class="pv-bullet" id="pv-off-wn3">3</div>
+                        </div>
+                        <div class="pv-btn-row">
+                            <div class="pv-button" id="pv-off-btn">BTN</div>
+                            <div class="pv-close-btn" onclick="closeModal('fullPreviewModal')">✕</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. MANAGE OFFLINE -->
+        <div class="page" id="page-man-off">
+            <div class="card" style="background: transparent; border: none; box-shadow: none; padding: 0;">
+                <div class="search-box"><i class="fas fa-search"></i><input type="text" id="off-searchInput" placeholder="Search Offline History..." onkeyup="renderOffList()"></div>
+                <ul class="app-list" id="off-appListContainer"><li style="text-align: center; color: #555; padding: 20px;">No offline codes yet.</li></ul>
+            </div>
+        </div>
+
+        <!-- 7. SETTINGS / PROFILE + CREDENTIALS -->
+        <div class="page" id="page-settings">
+            <div class="card settings-card">
+                <h3 style="color:var(--primary); margin-bottom: 20px;"><i class="fas fa-id-card"></i> Profile Details</h3>
+                <div id="profileLockMsg" style="display:none;padding:14px 16px;border-radius:14px;margin-bottom:16px;background:rgba(255,76,76,0.1);border:1px solid rgba(255,76,76,0.35);color:var(--text2);font-size:12px;line-height:1.6;"><i class="fas fa-lock" style="color:#FF4C4C;margin-right:8px;"></i>Profile edit is enabled for this account. Admin se contact karein agar details change karni ho. Niche bhare hue details aapke account ke saath hain.</div>
+                <div class="form-group"><label>Your Name</label><input type="text" id="profileName" placeholder="Enter your name"></div>
+                <div class="form-group"><label>Contact (WhatsApp / Telegram)</label><input type="text" id="profileContact" placeholder="WhatsApp number or Telegram username"></div>
+                <div class="form-group"><label>YouTube Channel</label><input type="text" id="profileYoutube" placeholder="Channel name or link"></div>
+                <div class="form-group"><label>Telegram Channel</label><input type="text" id="profileTelegram" placeholder="Channel name or link"></div>
+                <div id="profileMsg" style="color:#00E676; font-size:13px; margin-bottom:12px; display:none;"></div>
+                <button class="btn" id="profileSaveBtn" onclick="saveUserProfile()"><i class="fas fa-save"></i> SAVE PROFILE</button>
+            </div>
+            <div class="card settings-card" id="passwordChangeCard">
+                <h3 style="color:var(--primary); margin-bottom: 20px;"><i class="fas fa-cog"></i> Account Settings</h3>
+                <div class="form-group"><label>Current Username</label><input type="text" id="settingsCurUser" disabled style="opacity:0.7;"></div>
+                <div id="passwordChangeForm">
+                    <div class="form-group"><label>Current Password</label><input type="password" id="settingsOldPass" placeholder="Enter current password"></div>
+                    <div class="form-group"><label>New Password</label><input type="password" id="settingsNewPass" placeholder="New password (min 4 chars)"></div>
+                    <div id="settingsMsg" style="color:#00E676; font-size:13px; margin-bottom:12px; display:none;"></div>
+                    <button class="btn" onclick="changeUserCredentials()"><i class="fas fa-save"></i> CHANGE PASSWORD</button>
+                </div>
+                <div id="passwordBlockedMsg" style="display:none; text-align:center; padding:20px;">
+                    <i class="fas fa-lock" style="font-size:32px; color:var(--text3); margin-bottom:12px; display:block;"></i>
+                    <p style="color:var(--text2); font-size:14px; font-weight:600; margin-bottom:6px;">Password Change Not Allowed</p>
+                    <p style="color:var(--text3); font-size:12px;">Aapko password change karne ki permission nahi hai. Admin se contact karein.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. MANAGE UI OFFLINE (ADVANCED) -->
+        <div class="page" id="page-ui-off">
+            <div class="card">
+                <div class="ui-header">
+                    <div class="ui-header-icon"><i class="fas fa-paint-brush"></i></div>
+                    <div>
+                        <h3>Offline UI Customization</h3>
+                        <p>Design your update popup - changes apply live</p>
+                    </div>
+                </div>
+
+                <div class="category-box theme-custom">
+                    <div class="category-title"><i class="fas fa-crown"></i> Premium Theme (10 Styles)</div>
+                    <div class="custom-select" id="off-themeSel">
+                        <div class="select-btn" onclick="toggleDropdown('off-themeDropdown')"><span id="off-themeTxt">1. Default Purple Pro</span><i class="fas fa-chevron-down"></i></div>
+                        <div class="select-dropdown" id="off-themeDropdown">
+                            <div class="select-option" data-value="1" onclick="selectTheme('off','1','1. Default Purple Pro')">1. Default Purple Pro</div>
+                            <div class="select-option" data-value="2" onclick="selectTheme('off','2','2. Midnight Sapphire')">2. Midnight Sapphire</div>
+                            <div class="select-option" data-value="3" onclick="selectTheme('off','3','3. Emerald Luxe')">3. Emerald Luxe</div>
+                            <div class="select-option" data-value="4" onclick="selectTheme('off','4','4. Royal Violet Glass')">4. Royal Violet Glass</div>
+                            <div class="select-option" data-value="5" onclick="selectTheme('off','5','5. Sunset Blaze')">5. Sunset Blaze</div>
+                            <div class="select-option" data-value="6" onclick="selectTheme('off','6','6. Cyber Cyan')">6. Cyber Cyan</div>
+                            <div class="select-option" data-value="7" onclick="selectTheme('off','7','7. Golden Crown')">7. Golden Crown</div>
+                            <div class="select-option" data-value="8" onclick="selectTheme('off','8','8. Apple Clean Light')">8. Apple Clean Light</div>
+                            <div class="select-option" data-value="9" onclick="selectTheme('off','9','9. Matrix Terminal')">9. Matrix Terminal</div>
+                            <div class="select-option" data-value="10" onclick="selectTheme('off','10','10. Cream Frost')">10. Cream Frost</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="offThemeSelect" value="1">
+                </div>
+
+                <div class="category-box">
+                    <div class="category-title"><i class="fas fa-palette"></i> Colors</div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Background Color</label><input type="color" id="offUiBg" value="#1c1c1e" oninput="applyOffUI()"></div>
+                        <div class="form-group"><label>Primary/Button Color</label><input type="color" id="offUiPrimary" value="#B366FF" oninput="applyOffUI()"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Main Text Color</label><input type="color" id="offUiText" value="#ffffff" oninput="applyOffUI()"></div>
+                        <div class="form-group"><label>Danger/Tag Color</label><input type="color" id="offUiDanger" value="#ff4c4c" oninput="applyOffUI()"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Border Thickness (0 for none)</label><input type="number" id="offUiBorderW" value="0" oninput="applyOffUI()"></div>
+                        <div class="form-group"><label>Border Color</label><input type="color" id="offUiBorderC" value="#ffffff" oninput="applyOffUI()"></div>
+                    </div>
+                </div>
+
+                <div class="category-box">
+                    <div class="category-title"><i class="fas fa-wand-magic-sparkles"></i> Effects &amp; Corners</div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Popup Corner Radius</label><input type="number" id="offUiRadius" value="60" oninput="applyOffUI()"></div>
+                        <div class="form-group"><label>Button Radius</label><input type="number" id="offUiBtnRadius" value="30" oninput="applyOffUI()"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Background Dim (0.0 to 1.0)</label><input type="number" step="0.05" id="offUiDim" value="0.25" oninput="applyOffUI()"></div>
+                        <div class="form-group"><label>Blur Radius (1 to 100)</label><input type="number" id="offUiBlur" value="25" oninput="applyOffUI()"></div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-outline" style="margin-bottom: 15px;" onclick="showFullScreenPreview('off')"><i class="fas fa-eye"></i> 100% FULL SCREEN PREVIEW</button>
+                <button class="btn" style="margin-bottom: 15px;" onclick="showToast('Offline UI Saved!')"><i class="fas fa-save"></i> SAVE OFFLINE UI</button>
+                <button class="btn btn-reset" onclick="applyThemePreset('off', '1')"><i class="fas fa-undo"></i> RESET TO DEFAULT</button>
+            </div>
+        </div>
+
+        <!-- 9. SUPPORT & TICKETS -->
+        <div class="page" id="page-support">
+            <div class="generate-grid" style="grid-template-columns: 1fr !important;">
+                <div class="card" style="margin-bottom: 0;">
+                    <h3 style="color:var(--primary); margin-bottom: 20px;"><i class="fas fa-headset"></i> Support Center</h3>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-user-shield"></i> Developer</div>
+                        <div style="display:flex; align-items:center; gap:14px; margin-top:10px;">
+                            <img src="logo.png" alt="Logo" onerror="this.style.display='none'" style="width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid rgba(179,102,255,0.4); box-shadow:0 4px 16px rgba(179,102,255,0.3); flex-shrink:0;">
+                            <div>
+                                <div style="font-size:18px; font-weight:700; color:#fff;" id="supDevName">PRINCE HACKS</div>
+                                <p style="color:var(--text3); font-size:12px; margin-top:4px;">Developed by our team. Contact us anytime.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-comments"></i> Quick Contact</div>
+                        <div style="display:flex; flex-direction:column; gap:10px;">
+                            <button class="btn" style="background:linear-gradient(135deg,#25D366,#128C7E); white-space:nowrap;" onclick="openSupportLink('wa')"><i class="fab fa-whatsapp"></i> <span id="supWaText">WhatsApp</span></button>
+                            <button class="btn" style="background:linear-gradient(135deg,#229ED9,#0088cc); white-space:nowrap;" onclick="openSupportLink('tg')"><i class="fab fa-telegram-plane"></i> <span id="supTgText">Telegram</span></button>
+                        </div>
+                    </div>
+                    <div class="category-box">
+                        <div class="category-title"><i class="fas fa-info-circle"></i> How to Contact</div>
+                        <p style="color:var(--text2); font-size:12px; line-height:1.6;">Direct WhatsApp / Telegram pe baat karein, ya neeche ticket banayein. Ticket ka reply aapko yahin dikhega.</p>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 0;">
+                    <h3 style="color:var(--primary); margin-bottom: 20px;"><i class="fas fa-ticket-alt"></i> Raise a Ticket</h3>
+                    <div class="form-group"><label>Subject</label><input type="text" id="ticketSubject" placeholder="e.g. App expiry issue"></div>
+                    <div class="form-group"><label>Your Message (full details)</label><textarea id="ticketMsg" rows="5" placeholder="Describe your problem in detail like an email..."></textarea></div>
+                    <button class="btn" onclick="sendTicket()"><i class="fas fa-paper-plane"></i> SEND TICKET</button>
+                    <p style="color:var(--text3); font-size:11px; margin-top:10px; text-align:center;"><i class="fas fa-shield-alt"></i> Anti-spam: Naya ticket humesha <b style="color:var(--primary);">5 minute</b> ke baad hi send hoga.</p>
+                    <div class="dash-title" style="margin-top:24px;"><i class="fas fa-inbox"></i> My Tickets</div>
+                    <div id="myTicketsList" style="max-height:400px; overflow-y:auto;"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FULL SCREEN PREVIEW MODAL -->
+    <div id="fullPreviewModal">
+        <div id="fullPreviewBox" class="preview-wrapper" style="margin: auto;"></div>
+        <button class="close-preview-btn" onclick="closeModal('fullPreviewModal')"><i class="fas fa-times"></i> CLOSE PREVIEW</button>
+    </div>
+
+    <!-- SHARED MODALS -->
+    <div class="modal" id="codeModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal('codeModal')"><i class="fas fa-times"></i></span>
+            <div class="modal-header"><h3 id="modalCodeTitle">Java Code</h3></div>
+            <pre id="modalCodeDisplay"></pre>
+            <button class="btn" onclick="copyFromModal()"><i class="fas fa-copy"></i> COPY CODE</button>
+        </div>
+    </div>
+
+    <div class="modal" id="editModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="modal-close" onclick="closeModal('editModal')"><i class="fas fa-times"></i></span>
+            <div class="modal-header"><h3>Edit Online App</h3></div>
+            <input type="hidden" id="editAppCode">
+            <div class="form-group"><label>App Name</label><input type="text" id="editAppName"></div>
+            <div class="form-group"><label>Expiry Time</label><input type="datetime-local" id="editExpiryDate"></div>
+            <button class="btn" onclick="saveAppEdits()">SAVE CHANGES</button>
+        </div>
+    </div>
+
+    <div class="modal" id="notifModal">
+        <div class="modal-content" style="max-width: 480px;">
+            <span class="modal-close" onclick="closeModal('notifModal')"><i class="fas fa-times"></i></span>
+            <div class="modal-header"><h3><i class="fas fa-bell" style="color:var(--primary);"></i> Notifications</h3></div>
+            <div id="notifList"></div>
+            <button class="btn-small btn-delete" id="notifClearBtn" onclick="clearNotifications()" style="margin-top:12px;display:none;" title="Clear All"><i class="fas fa-trash"></i> CLEAR ALL</button>
+            <div id="notifList"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toastBox"><i class="fas fa-check-circle" id="toastIcon"></i> <span id="toastMsg">Success</span></div>
+
+    <!-- CORE JAVASCRIPT -->
+        <script src="index.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+{
+  "rules": {
+    "app_control": {
+      "apps": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["timestamp"],
+        "$code": {
+          ".validate": "!newData.exists() || (newData.hasChildren(['name','timestamp','expiryTime']) && newData.child('name').isString() && newData.child('timestamp').isNumber() && newData.child('expiryTime').isNumber())",
+          "devices": {
+            ".read": true,
+            ".write": true,
+            "$deviceId": {
+              ".validate": "!newData.exists() || newData.hasChildren(['model','firstSeen','lastSeen'])"
+            }
+          }
+        }
+      }
+    },
+    "support_config": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "support_tickets": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["timestamp"],
+      "$ticket": {
+        ".validate": "!newData.exists() || (newData.hasChildren(['user','subject','message','timestamp']) && newData.child('user').isString() && newData.child('subject').isString() && newData.child('message').isString() && newData.child('timestamp').isNumber())"
+      }
+    },
+    "notifications": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["time"],
+      "$id": {
+        ".validate": "!newData.exists() || (newData.hasChildren(['text','time']) && newData.child('text').isString() && newData.child('time').isNumber())"
+      }
+    },
+    "admin_control": {
+      "users": {
+        ".read": true,
+        "$uid": {
+          ".write": "auth != null",
+          ".validate": "!newData.exists() || newData.hasChildren(['username','password'])",
+          "username": {
+            ".validate": "newData.isString() && newData.val().length > 0"
+          },
+          "password": {
+            ".write": true,
+            ".validate": "newData.isString() && newData.val().length >= 4"
+          },
+          "device": {
+            ".validate": "newData.isString()"
+          },
+          "deviceLimit": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10"
+          },
+          "canChangePassword": {
+            ".validate": "newData.isBoolean()"
+          },
+          "profileEdit": {
+            ".validate": "newData.isBoolean()"
+          },
+          "created": {
+            ".validate": "newData.isNumber()"
+          },
+          "lockedDevices": {
+            ".write": true,
+            "$d": {
+              ".validate": "newData.isString() || (newData.hasChildren(['id','firstSeen','lastSeen']))"
+            }
+          },
+          "profile": {
+            ".write": true,
+            "$k": {
+              ".validate": "newData.isString()"
+            }
+          },
+          "online": {
+            ".write": true,
+            ".validate": "newData.isBoolean()"
+          },
+          "lastSeen": {
+            ".write": true,
+            ".validate": "newData.isNumber()"
+          }
+        }
+      }
+    }
+  }
+}
